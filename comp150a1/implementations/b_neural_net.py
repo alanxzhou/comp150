@@ -160,8 +160,6 @@ class TwoLayerNet(object):
     # TODO: use the function compute_scores() and softmax_loss(), also implement# 
     # the regularization term here, to compute the training objective           #
     #############################################################################
-    #C = np.shape(X)[1]
-
     W1, b1 = self.params['W1'], self.params['b1']
     W2, b2 = self.params['W2'], self.params['b2']
 
@@ -225,19 +223,27 @@ class TwoLayerNet(object):
     train_acc_history = []
     val_acc_history = []
 
+    indices = np.random.choice(num_train,num_train)
+    rerandomize_threshold = round(num_train/batch_size)
+
     for it in range(num_iters):
 
-      #if it % 50 == 0:
-      #  print('iteration %d / %d' %(it, num_iters))
+      if it % rerandomize_threshold == 0:
+        indices = np.random.choice(num_train,num_train)
+
+      if verbose:
+        if it % 50 == 0:
+          print('iteration %d / %d' %(it, num_iters))
 
       #########################################################################
       # TODO: Create a random minibatch of training data and labels, storing  #
       # them in X_batch and y_batch respectively.                             #
       # 
       #########################################################################
-      indices = np.random.choice(num_train,batch_size)
-      X_batch = X_train[indices]
-      y_batch = y_train[indices]
+      #indices = np.random.choice(num_train,batch_size)
+      current_index = indices[np.arange(it*batch_size,(it+1)*batch_size) % num_train]
+      X_batch = X_train[current_index]
+      y_batch = y_train[current_index]
 
       # Compute loss and gradients using the current minibatch
       loss_history.append(self.session.run(loss, feed_dict={X:X_batch, y:y_batch})) # need to feed in the data batch
