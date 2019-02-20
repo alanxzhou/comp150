@@ -47,10 +47,11 @@ class TwoLayerNet(object):
     self.params['b1'] = tf.Variable(np.zeros(hidden_size), dtype=tf.float32)
     self.params['W2'] = tf.Variable(std * np.random.randn(hidden_size, output_size), dtype=tf.float32)
     self.params['b2'] = tf.Variable(np.zeros(output_size), dtype=tf.float32)
-
+    self.session = tf.Session()
+ 
   def get_learned_parameters(self):
     """
-    Get parameters by running tf variables 
+    #Get parameters by running tf variables 
     """
 
     learned_params = dict()
@@ -85,13 +86,14 @@ class TwoLayerNet(object):
     # TODO: compute the softmax loss. please check the documentation of         # 
     # tf.nn.softmax_cross_entropy_with_logits                                   #
     #############################################################################
-    labels = tf.one_hot(y,3)
+    C =tf.shape(self.params['W2'])[-1]
+    labels = tf.one_hot(tf.cast(y,tf.int32),C)
     softmax_loss = tf.nn.softmax_cross_entropy_with_logits(labels = labels, logits = scores)
 
     return softmax_loss
 
 
-  def compute_scores(self, X, C):
+  def compute_scores(self, X):
     """
     Compute the loss and gradients for a two layer fully connected neural
     network. Implement this function in tensorflow
@@ -126,11 +128,13 @@ class TwoLayerNet(object):
     inner_prod_squeezed2 = tf.squeeze(inner_prod2)
     scores = inner_prod_squeezed2
 
+    prediction = tf.argmax(scores,axis = 1)
+
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
     
-    return scores
+    return scores, prediction
 
 
   def compute_objective(self, X, y, reg):
@@ -153,8 +157,7 @@ class TwoLayerNet(object):
     # the regularization term here, to compute the training objective           #
     #############################################################################
     #C = np.shape(X)[1]
-    C = tf.shape(X)[1]
-    scores = self.compute_scores(X,C)
+    scores, _ = self.compute_scores(X)
     softmax_loss = self.softmax_loss(scores,y)
     objective = tf.reduce_sum(softmax_loss) + reg
 
@@ -186,26 +189,28 @@ class TwoLayerNet(object):
     """
     num_train = X_train.shape[0]
     num_features = X_train.shape[1]
-    num_classes = 4
 
     iterations_per_epoch = max(num_train / batch_size, 1)
     X = tf.placeholder(shape=[None, num_features], dtype=tf.float32, name='feature')
     y = tf.placeholder(shape=[None], dtype=tf.float32, name='label')
 
+    # prediction
+    scores, pred = self.compute_scores(X=X)
+
     # calculate objective
-    loss = self.compute_objective(X_train,y_train,reg)
+    loss = self.compute_objective(X=X,y=y,reg=reg)
 
     # get the gradient and the update operation
     opt = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
     grads_vars = opt.compute_gradients(loss, var_list=[self.params['W1'],self.params['b1'],self.params['W2'],self.params['b2']])
+    #grads_vars = opt.compute_gradients(loss, var_list=list(self.get_learned_parameters()))
     update = opt.apply_gradients(grads_vars)
 
     # by this line, you should have constructed the tensorflow graph  
     # no more graph construction
-    init = tf.global_variables_initializer()
     ############################################################################
     # after this line, you should execute appropriate operations in the graph to train the mode  
-
+    init = tf.global_variables_initializer()
     session = tf.Session()
     session.run(init)
 
@@ -214,9 +219,17 @@ class TwoLayerNet(object):
     train_acc_history = []
     val_acc_history = []
 
+    #indices = np.random.choice(num_train,batch_size)
+    #X_batch = X_train[indices]
+    #y_batch = y_train[indices]
+
+    #X_batch = X_train
+    #y_batch = y_train
+
+
     for it in range(num_iters):
 
-      if it % 10 == 0 and it > 1:
+      if it % 50 == 0:
         print('iteration %d / %d' %(it, num_iters))
 
       #########################################################################
@@ -229,24 +242,43 @@ class TwoLayerNet(object):
       y_batch = y_train[indices]
 
       # Compute loss and gradients using the current minibatch
-      loss = self.compute_objective(X_batch, y=y_batch, reg=reg)
+      #loss = self.compute_objective(X_batch, y=y_batch, reg=reg)
       loss_history.append(session.run(loss, feed_dict={X:X_batch, y:y_batch})) # need to feed in the data batch
 
+      session.run(pred, feed_dict ={X:X_batch})
+
       # run the update operation to perform one gradient descending step
-      session.run(update)
+      session.run(update, feed_dict = {X:X_batch, y:y_batch})
 
       #########################################################################
       #                             END OF YOUR CODE                          #
       #########################################################################
 
-      if verbose and it % 100 == 0:
-        print('iteration %d / %d: loss %f' % (it, num_iters, loss))
+      #if verbose and it % 100 == 0:
+      #  print('iteration %d / %d: loss %f' % (it, num_iters, loss))
 
       # Every epoch, check train and val accuracy and decay learning rate.
       if it % iterations_per_epoch == 0:
         # Check accuracy
-        train_acc = (self.predict(X_batch) == y_batch).mean()
-        val_acc = (self.predict(X_val) == y_val).mean()
+        #train_acc = (session.run(scores, feed_dict = {X:X_batch}) == y_batch).mean()
+        #scores = self.compute_scores(X_batch)
+        #session.run(scores,feed_dict = {X:X_batch})
+        #y_pred = tf.argmax(scores)
+        #train_acc = np.mean(self.predict(y_pred,session) == y_batch)
+
+        #train_acc = (self.predict(X_batch) == y_batch).mean()
+        #val_acc = (self.predict(X_val) == y_val).mean(0)
+        #scores_val = self.compute_scores(X_val)
+        #session.run(scores_val,feed_dict = {X:X_val})
+        #y_pred_val = tf.argmax(scores_val)
+        #val_acc = np.mean(self.predict(y_pred_val,session) == y_val)
+
+
+        #train_acc = (self.predict(pred,X_batch,session)==y_batch).mean()
+        #print(session.run(pred,feed_dict ={X:X_val}))
+        #print(y_batch)
+        train_acc = np.mean((session.run(pred,feed_dict ={X:X_batch}) == y_batch))
+        val_acc = np.mean((session.run(pred,feed_dict ={X:X_val}) == y_val))
         train_acc_history.append(train_acc)
         val_acc_history.append(val_acc)
 
@@ -260,7 +292,7 @@ class TwoLayerNet(object):
     }
 
 
-  def predict(self, X):
+  def predict(self,X):
     """
     Use the trained weights of this two-layer network to predict labels for
     data points. For each data point we predict scores for each of the C
@@ -272,11 +304,10 @@ class TwoLayerNet(object):
 
     Returns:
     - y_pred: A numpy array of shape (N,) giving predicted labels for each of
-      the elements of X. For all i, y_pred[i] = c means that X[i] is predicted
+      the elements of X. For all i, y_pred[i]  = c means that X[i] is predicted
       to have class c, where 0 <= c < C.
     """
 
-    y_pred = None
 
     ###########################################################################
     # TODO: Implement this function.                                          #
@@ -285,7 +316,10 @@ class TwoLayerNet(object):
     # You cannot use tensorflow operations here. 
     # Instead, build a computational graph somewhere else and run it here.  
     # This function is executed in a for-loop in training 
-    pass
+    
+    _,y_pred = self.session.run(self.compute_scores(X))
+    #y_pred = np.argmax(np.dot(np.maximum(0, X.dot(self.params['W1']) + self.params['b1']), self.params['W2']) + self.params['b2'], axis=1)
+
     ###########################################################################
     #                              END OF YOUR CODE                           #
     ###########################################################################
