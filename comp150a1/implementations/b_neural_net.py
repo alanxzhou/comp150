@@ -158,10 +158,13 @@ class TwoLayerNet(object):
     # the regularization term here, to compute the training objective           #
     #############################################################################
     #C = np.shape(X)[1]
+
+    W1, b1 = self.params['W1'], self.params['b1']
+    W2, b2 = self.params['W2'], self.params['b2']
+
     scores, _ = self.compute_scores(X)
     softmax_loss = self.softmax_loss(scores,y)
-    reg_term = reg
-    objective = tf.reduce_sum(softmax_loss) + reg_term
+    objective = tf.reduce_sum(softmax_loss) + reg * (tf.reduce_sum(W1 * W1) + tf.reduce_sum(W2 * W2))
 
     #############################################################################
     #                              END OF YOUR CODE                             #
@@ -246,7 +249,7 @@ class TwoLayerNet(object):
       #loss = self.compute_objective(X_batch, y=y_batch, reg=reg)
       loss_history.append(self.session.run(loss, feed_dict={X:X_batch, y:y_batch})) # need to feed in the data batch
 
-      self.session.run(pred, feed_dict ={X:X_batch})
+      #self.session.run(pred, feed_dict ={X:X_batch})
 
       # run the update operation to perform one gradient descending step
       self.session.run(update, feed_dict = {X:X_batch, y:y_batch})
