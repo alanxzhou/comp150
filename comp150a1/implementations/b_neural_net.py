@@ -47,8 +47,9 @@ class TwoLayerNet(object):
     self.params['b1'] = tf.Variable(np.zeros(hidden_size), dtype=tf.float32)
     self.params['W2'] = tf.Variable(std * np.random.randn(hidden_size, output_size), dtype=tf.float32)
     self.params['b2'] = tf.Variable(np.zeros(output_size), dtype=tf.float32)
+
     self.session = tf.Session()
- 
+
   def get_learned_parameters(self):
     """
     #Get parameters by running tf variables 
@@ -159,7 +160,8 @@ class TwoLayerNet(object):
     #C = np.shape(X)[1]
     scores, _ = self.compute_scores(X)
     softmax_loss = self.softmax_loss(scores,y)
-    objective = tf.reduce_sum(softmax_loss) + reg
+    reg_term = reg
+    objective = tf.reduce_sum(softmax_loss) + reg_term
 
     #############################################################################
     #                              END OF YOUR CODE                             #
@@ -200,19 +202,18 @@ class TwoLayerNet(object):
     # calculate objective
     loss = self.compute_objective(X=X,y=y,reg=reg)
 
-    # get the gradient and the update operation
+      # get the gradient and the update operation
     opt = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
     grads_vars = opt.compute_gradients(loss, var_list=[self.params['W1'],self.params['b1'],self.params['W2'],self.params['b2']])
     #grads_vars = opt.compute_gradients(loss, var_list=list(self.get_learned_parameters()))
     update = opt.apply_gradients(grads_vars)
-
     # by this line, you should have constructed the tensorflow graph  
     # no more graph construction
     ############################################################################
     # after this line, you should execute appropriate operations in the graph to train the mode  
     init = tf.global_variables_initializer()
-    session = tf.Session()
-    session.run(init)
+    #session = tf.Session()
+    self.session.run(init)
 
     # Use SGD to optimize the parameters in self.model
     loss_history = []
@@ -243,12 +244,12 @@ class TwoLayerNet(object):
 
       # Compute loss and gradients using the current minibatch
       #loss = self.compute_objective(X_batch, y=y_batch, reg=reg)
-      loss_history.append(session.run(loss, feed_dict={X:X_batch, y:y_batch})) # need to feed in the data batch
+      loss_history.append(self.session.run(loss, feed_dict={X:X_batch, y:y_batch})) # need to feed in the data batch
 
-      session.run(pred, feed_dict ={X:X_batch})
+      self.session.run(pred, feed_dict ={X:X_batch})
 
       # run the update operation to perform one gradient descending step
-      session.run(update, feed_dict = {X:X_batch, y:y_batch})
+      self.session.run(update, feed_dict = {X:X_batch, y:y_batch})
 
       #########################################################################
       #                             END OF YOUR CODE                          #
@@ -277,8 +278,8 @@ class TwoLayerNet(object):
         #train_acc = (self.predict(pred,X_batch,session)==y_batch).mean()
         #print(session.run(pred,feed_dict ={X:X_val}))
         #print(y_batch)
-        train_acc = np.mean((session.run(pred,feed_dict ={X:X_batch}) == y_batch))
-        val_acc = np.mean((session.run(pred,feed_dict ={X:X_val}) == y_val))
+        train_acc = np.mean((self.session.run(pred,feed_dict ={X:X_batch}) == y_batch))
+        val_acc = np.mean((self.session.run(pred,feed_dict ={X:X_val}) == y_val))
         train_acc_history.append(train_acc)
         val_acc_history.append(val_acc)
 
