@@ -47,9 +47,10 @@ class TwoLayerNet(object):
     self.params['b1'] = tf.Variable(np.zeros(hidden_size), dtype=tf.float32)
     self.params['W2'] = tf.Variable(std * np.random.randn(hidden_size, output_size), dtype=tf.float32)
     self.params['b2'] = tf.Variable(np.zeros(output_size), dtype=tf.float32)
-    self.scores = tf.placeholder(shape = [1], dtype = tf.float32, name = 'scores')
     self.objective = tf.placeholder(shape = [1], dtype = tf.float32, name = 'scores')
-    self.prediction = tf.placeholder(shape = [1], dtype = tf.float32, name = 'scores')
+    self.X = tf.placeholder(shape=[None, input_size], dtype=tf.float32, name='feature')
+    self.y = tf.placeholder(shape=[None], dtype=tf.float32, name='label')
+    self.scores, self.prediction = self.compute_scores(X=self.X)
 
     self.session = tf.Session()
 
@@ -197,14 +198,9 @@ class TwoLayerNet(object):
     num_features = X_train.shape[1]
 
     iterations_per_epoch = max(num_train / batch_size, 1)
-    X = tf.placeholder(shape=[None, num_features], dtype=tf.float32, name='feature')
-    y = tf.placeholder(shape=[None], dtype=tf.float32, name='label')
-
-    # prediction
-    self.scores, self.prediction = self.compute_scores(X=X)
 
     # calculate objective
-    loss = self.compute_objective(X=X,y=y,reg=reg)
+    loss = self.compute_objective(X=self.X,y=self.y,reg=reg)
 
     # get the gradient and the update operation
     opt = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
@@ -215,6 +211,7 @@ class TwoLayerNet(object):
     # no more graph construction
     ############################################################################
     # after this line, you should execute appropriate operations in the graph to train the mode  
+
     init = tf.global_variables_initializer()
     self.session.run(init)
 
@@ -246,12 +243,11 @@ class TwoLayerNet(object):
       y_batch = y_train[current_index]
 
       # Compute loss and gradients using the current minibatch
-      loss_history.append(self.session.run(loss, feed_dict={X:X_batch, y:y_batch})) # need to feed in the data batch
-
+      loss_history.append(self.session.run(loss, feed_dict={self.X:X_batch, self.y:y_batch})) # need to feed in the data batch
       #self.session.run(pred, feed_dict ={X:X_batch})
 
       # run the update operation to perform one gradient descending step
-      self.session.run(update, feed_dict = {X:X_batch, y:y_batch})
+      self.session.run(update, feed_dict = {self.X:X_batch, self.y:y_batch})
 
       #########################################################################
       #                             END OF YOUR CODE                          #
@@ -263,14 +259,17 @@ class TwoLayerNet(object):
       # Every epoch, check train and val accuracy and decay learning rate.
       if it % iterations_per_epoch == 0:
         # Check accuracy
-        train_acc = np.mean((self.session.run(self.prediction,feed_dict ={X:X_batch}) == y_batch))
-        #train_acc = np.mean(self.predict(X_batch) == y_batch)
-        val_acc = np.mean((self.session.run(self.prediction,feed_dict ={X:X_val}) == y_val))
+        #train_acc = np.mean((self.session.run(self.prediction,feed_dict ={self.X:X_batch}) == y_batch))
+        #val_acc = np.mean((self.session.run(self.prediction,feed_dict ={self.X:X_val}) == y_val))
+        train_acc = np.mean(self.predict(X_batch) == y_batch)
+        val_acc = np.mean(self.predict(X_val) == y_val)
         train_acc_history.append(train_acc)
         val_acc_history.append(val_acc)
 
         # Decay learning rate
         learning_rate *= learning_rate_decay
+
+      tf.reset_default_graph() 
 
     return {
       'loss_history': loss_history,
@@ -304,8 +303,7 @@ class TwoLayerNet(object):
     # Instead, build a computational graph somewhere else and run it here.  
     # This function is executed in a for-loop in training 
     
-    #_,y_pred = self.session.run(self.prediction, feed_dict = {X:X_in})
-    _,y_pred = self.session.run(self.compute_scores(X_in))
+    y_pred = self.session.run(self.prediction, feed_dict = {self.X:X_in})
 
     ###########################################################################
     #                              END OF YOUR CODE                           #
