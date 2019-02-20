@@ -47,6 +47,9 @@ class TwoLayerNet(object):
     self.params['b1'] = tf.Variable(np.zeros(hidden_size), dtype=tf.float32)
     self.params['W2'] = tf.Variable(std * np.random.randn(hidden_size, output_size), dtype=tf.float32)
     self.params['b2'] = tf.Variable(np.zeros(output_size), dtype=tf.float32)
+    self.scores = tf.placeholder(shape = [1], dtype = tf.float32, name = 'scores')
+    self.objective = tf.placeholder(shape = [1], dtype = tf.float32, name = 'scores')
+    self.prediction = tf.placeholder(shape = [1], dtype = tf.float32, name = 'scores')
 
     self.session = tf.Session()
 
@@ -200,12 +203,12 @@ class TwoLayerNet(object):
     y = tf.placeholder(shape=[None], dtype=tf.float32, name='label')
 
     # prediction
-    scores, pred = self.compute_scores(X=X)
+    self.scores, self.prediction = self.compute_scores(X=X)
 
     # calculate objective
     loss = self.compute_objective(X=X,y=y,reg=reg)
 
-      # get the gradient and the update operation
+    # get the gradient and the update operation
     opt = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
     grads_vars = opt.compute_gradients(loss, var_list=[self.params['W1'],self.params['b1'],self.params['W2'],self.params['b2']])
     #grads_vars = opt.compute_gradients(loss, var_list=list(self.get_learned_parameters()))
@@ -215,7 +218,6 @@ class TwoLayerNet(object):
     ############################################################################
     # after this line, you should execute appropriate operations in the graph to train the mode  
     init = tf.global_variables_initializer()
-    #session = tf.Session()
     self.session.run(init)
 
     # Use SGD to optimize the parameters in self.model
@@ -223,18 +225,10 @@ class TwoLayerNet(object):
     train_acc_history = []
     val_acc_history = []
 
-    #indices = np.random.choice(num_train,batch_size)
-    #X_batch = X_train[indices]
-    #y_batch = y_train[indices]
-
-    #X_batch = X_train
-    #y_batch = y_train
-
-
     for it in range(num_iters):
 
-      if it % 50 == 0:
-        print('iteration %d / %d' %(it, num_iters))
+      #if it % 50 == 0:
+      #  print('iteration %d / %d' %(it, num_iters))
 
       #########################################################################
       # TODO: Create a random minibatch of training data and labels, storing  #
@@ -246,7 +240,6 @@ class TwoLayerNet(object):
       y_batch = y_train[indices]
 
       # Compute loss and gradients using the current minibatch
-      #loss = self.compute_objective(X_batch, y=y_batch, reg=reg)
       loss_history.append(self.session.run(loss, feed_dict={X:X_batch, y:y_batch})) # need to feed in the data batch
 
       #self.session.run(pred, feed_dict ={X:X_batch})
@@ -264,25 +257,9 @@ class TwoLayerNet(object):
       # Every epoch, check train and val accuracy and decay learning rate.
       if it % iterations_per_epoch == 0:
         # Check accuracy
-        #train_acc = (session.run(scores, feed_dict = {X:X_batch}) == y_batch).mean()
-        #scores = self.compute_scores(X_batch)
-        #session.run(scores,feed_dict = {X:X_batch})
-        #y_pred = tf.argmax(scores)
-        #train_acc = np.mean(self.predict(y_pred,session) == y_batch)
-
-        #train_acc = (self.predict(X_batch) == y_batch).mean()
-        #val_acc = (self.predict(X_val) == y_val).mean(0)
-        #scores_val = self.compute_scores(X_val)
-        #session.run(scores_val,feed_dict = {X:X_val})
-        #y_pred_val = tf.argmax(scores_val)
-        #val_acc = np.mean(self.predict(y_pred_val,session) == y_val)
-
-
-        #train_acc = (self.predict(pred,X_batch,session)==y_batch).mean()
-        #print(session.run(pred,feed_dict ={X:X_val}))
-        #print(y_batch)
-        train_acc = np.mean((self.session.run(pred,feed_dict ={X:X_batch}) == y_batch))
-        val_acc = np.mean((self.session.run(pred,feed_dict ={X:X_val}) == y_val))
+        train_acc = np.mean((self.session.run(self.prediction,feed_dict ={X:X_batch}) == y_batch))
+        #train_acc = np.mean(self.predict(X_batch) == y_batch)
+        val_acc = np.mean((self.session.run(self.prediction,feed_dict ={X:X_val}) == y_val))
         train_acc_history.append(train_acc)
         val_acc_history.append(val_acc)
 
@@ -296,7 +273,7 @@ class TwoLayerNet(object):
     }
 
 
-  def predict(self,X):
+  def predict(self,X_in):
     """
     Use the trained weights of this two-layer network to predict labels for
     data points. For each data point we predict scores for each of the C
@@ -321,8 +298,8 @@ class TwoLayerNet(object):
     # Instead, build a computational graph somewhere else and run it here.  
     # This function is executed in a for-loop in training 
     
-    _,y_pred = self.session.run(self.compute_scores(X))
-    #y_pred = np.argmax(np.dot(np.maximum(0, X.dot(self.params['W1']) + self.params['b1']), self.params['W2']) + self.params['b2'], axis=1)
+    #_,y_pred = self.session.run(self.prediction, feed_dict = {X:X_in})
+    _,y_pred = self.session.run(self.compute_scores(X_in))
 
     ###########################################################################
     #                              END OF YOUR CODE                           #
