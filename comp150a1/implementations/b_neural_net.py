@@ -43,10 +43,10 @@ class TwoLayerNet(object):
 
     # store parameters in numpy arrays
     self.params = {}
-    self.params['W1'] = tf.Variable(std * np.random.randn(input_size, hidden_size), dtype=tf.float32)
-    self.params['b1'] = tf.Variable(np.zeros(hidden_size), dtype=tf.float32)
-    self.params['W2'] = tf.Variable(std * np.random.randn(hidden_size, output_size), dtype=tf.float32)
-    self.params['b2'] = tf.Variable(np.zeros(output_size), dtype=tf.float32)
+    self.params['W1'] = tf.Variable(std * np.random.normal(scale = 1, size = [input_size, hidden_size]), dtype=tf.float32)
+    self.params['b1'] = tf.Variable(np.random.normal(scale = 1, size = hidden_size), dtype=tf.float32)
+    self.params['W2'] = tf.Variable(std * np.random.normal(scale = 1, size = [hidden_size, output_size]), dtype=tf.float32)
+    self.params['b2'] = tf.Variable(np.random.normal(scale = 1, size = output_size), dtype=tf.float32)
     self.objective = tf.placeholder(shape = [1], dtype = tf.float32, name = 'scores')
     self.X = tf.placeholder(shape=[None, input_size], dtype=tf.float32, name='feature')
     self.y = tf.placeholder(shape=[None], dtype=tf.float32, name='label')
@@ -130,9 +130,7 @@ class TwoLayerNet(object):
     x1 = tf.add(inner_prod_squeezed1, b1, name='score1')
     x2 = tf.nn.relu(x1)
     inner_prod2 = tf.matmul(x2,W2)
-    inner_prod_squeezed2 = tf.squeeze(inner_prod2)
-    scores = inner_prod_squeezed2
-
+    scores = tf.squeeze(inner_prod2)
     prediction = tf.argmax(scores,axis = 1)
 
     #############################################################################
@@ -237,7 +235,6 @@ class TwoLayerNet(object):
       # them in X_batch and y_batch respectively.                             #
       # 
       #########################################################################
-      #indices = np.random.choice(num_train,batch_size)
       current_index = indices[np.arange(it*batch_size,(it+1)*batch_size) % num_train]
       X_batch = X_train[current_index]
       y_batch = y_train[current_index]
@@ -269,7 +266,7 @@ class TwoLayerNet(object):
         # Decay learning rate
         learning_rate *= learning_rate_decay
 
-      tf.reset_default_graph() 
+      #tf.reset_default_graph() 
 
     return {
       'loss_history': loss_history,
