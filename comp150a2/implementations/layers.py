@@ -1,4 +1,5 @@
 import numpy as np
+import tensorflow as tf
 import warnings
 
 
@@ -135,7 +136,10 @@ def dropout_forward(x, dropout_param):
         # TODO: Implement training phase forward pass for inverted dropout.   #
         # Store the dropout mask in the mask variable.                        #
         #######################################################################
-        pass
+        sess = tf.Session()
+        dropped = tf.nn.dropout(x, keep_prob = p)
+        out = sess.run(dropped)
+        #out = tf.Session().run(tf.nn.dropout(x, keep_prob=p))
         #######################################################################
         #                           END OF YOUR CODE                          #
         #######################################################################
@@ -143,7 +147,7 @@ def dropout_forward(x, dropout_param):
         #######################################################################
         # TODO: Implement the test phase forward pass for inverted dropout.   #
         #######################################################################
-        pass
+        out = x
         #######################################################################
         #                            END OF YOUR CODE                         #
         #######################################################################

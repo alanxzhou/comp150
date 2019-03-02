@@ -6,6 +6,8 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
+from implementations.layers import dropout_forward
+
 class FullyConnectedNet(object):
   """
   A multi-layer fully-connected neural network. The net has a series of hidden layers, 
@@ -70,7 +72,7 @@ class FullyConnectedNet(object):
     # data center 
     self.placeholders['x_center'] = tf.placeholder(dtype=tf.float32, shape=[input_size])
 
-    # keeping probability of the droput layer
+    # keeping probability of the dropout layer
     self.placeholders['keep_prob'] = tf.placeholder(dtype=tf.float32, shape=[])
 
     # regularization weight 
@@ -166,7 +168,6 @@ class FullyConnectedNet(object):
               class c on input X[i].
 
     """
-    
 
     ####################################################################
     # You need to add batch normalization layers and dropout layers to #
@@ -177,8 +178,6 @@ class FullyConnectedNet(object):
     # keep_prob: the probability of keeping values                     #
     # training_mode: indicate the mode of running the graph            #
     ####################################################################
-    
-
 
 
     # Unpack variables from the params dictionary
@@ -205,7 +204,22 @@ class FullyConnectedNet(object):
         else:
             
             # non-linear transformation
-            hidden = tf.nn.relu(linear_trans)
+            relu = tf.nn.relu(linear_trans)
+            #dropped = tf.nn.dropout(relu, self.placeholders['keep_prob'])
+            #print(W.get_shape())
+            #print(dropped.get_shape())
+            #feed_dict = {'mode': self.placeholders['training_mode'], 'p': self.placeholders['keep_prob']}
+            if self.placeholders['training_mode'] is not None:
+              training_mode = 'train'
+              dropped = tf.nn.dropout(relu, keep_prob = self.placeholders['keep_prob'])
+            else:
+              training_mode = 'test'
+              dropped = relu
+            #feed_dict = {'mode': training_mode, 'p': self.placeholders['keep_prob']}
+            #dropped = dropout_forward(relu, feed_dict)
+            #hidden = tf.matmul(dropped,tf.transpose(W))
+            hidden = dropped
+
 
         
     scores = hidden
