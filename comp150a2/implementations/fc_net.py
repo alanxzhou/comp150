@@ -101,11 +101,19 @@ class FullyConnectedNet(object):
     self.operations['training_step'] = training_step 
 
     if self.options['use_bn']:
-        bn_update = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+      #self.placeholders['running_mean'] = tf.placeholder(dtype=tf.float32, shape=[input_size])
+      #self.placeholders['running_variance'] = tf.placeholder(dtype=tf.float32, shape=[input_size])
+      #self.placeholders['batch_mean'] = tf.placeholder(dtype=tf.float32, shape=[input_size])
+      #self.placeholders['batch_variance'] = tf.placeholder(dtype=tf.float32, shape=[input_size])
+      #self.placeholders['gamma'] = tf.placeholder(dtype=tf.float32, shape=[])
+      #self.placeholders['beta'] = tf.placeholder(dtype=tf.float32, shape=[])
+      #self.placeholders['epsilon'] = tf.constant(dtype=tf.float32, value = 1e-6)
+      #self.placeholders['momentum'] = tf.constant(dtype=tf.float32, value = 0.95)
+      bn_update = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     else: 
-        bn_update = []
+      bn_update = []
     self.operations['bn_update'] = bn_update
-
+    tf.group([training_step,bn_update])
 
     # maintain a session for the entire model
     self.session = tf.Session()
@@ -203,13 +211,21 @@ class FullyConnectedNet(object):
         # otherwise optionally apply batch normalization, relu, and dropout to all layers 
         else:
             
+            # batch normalization
+            if self.options['use_bn']:
+              #self.placeholders['batch_mean'] = linear_trans.mean(axis = -1)
+              batched = tf.layers.batch_normalization(linear_trans, training = self.placeholders['training_mode'], momentum = 0.95)
+              #batched = tf.nn.batch_normalization(linear_trans,self.placeholders['batch_mean'],self.placeholders['batch_variance'],
+              #                                    self.placeholders['beta'],self.placeholders['gamma'],self.placeholders['epsilon'])
+            else:
+              batched = linear_trans
+
             # non-linear transformation
-            relu = tf.nn.relu(linear_trans)
-            #dropped = tf.nn.dropout(relu, self.placeholders['keep_prob'])
-            #print(W.get_shape())
-            #print(dropped.get_shape())
-            #feed_dict = {'mode': self.placeholders['training_mode'], 'p': self.placeholders['keep_prob']}
-            if self.placeholders['training_mode'] is not None:
+            relu = tf.nn.relu(batched)
+
+            # dropout
+            #if self.placeholders['training_mode'] is not None:
+            if self.placeholders['training_mode'] == True:
               training_mode = 'train'
               dropped = tf.nn.dropout(relu, keep_prob = self.placeholders['keep_prob'])
             else:
@@ -217,7 +233,7 @@ class FullyConnectedNet(object):
               dropped = relu
             #feed_dict = {'mode': training_mode, 'p': self.placeholders['keep_prob']}
             #dropped = dropout_forward(relu, feed_dict)
-            #hidden = tf.matmul(dropped,tf.transpose(W))
+
             hidden = dropped
 
 
