@@ -2,8 +2,6 @@ import numpy as np
 import tensorflow as tf
 import warnings
 
-
-
 def batchnorm_forward(x, gamma, beta, bn_param):
     """
     Forward pass for batch normalization.
@@ -189,12 +187,30 @@ def conv_forward_naive(x, w, b, conv_param):
       H' = 1 + (H + 2 * pad - HH) / stride
       W' = 1 + (W + 2 * pad - WW) / stride
     """
-    out = None
     ###########################################################################
     # TODO: Implement the convolutional forward pass.                         #
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
-    pass
+
+    stride = conv_param['stride']
+    pad = conv_param['pad']
+
+    # padding
+    npad = ((0,0),(pad,pad),(pad,pad),(0,0))
+    x_padded = np.pad(x, npad, 'constant', constant_values = 0)
+
+    [N, H, W, C] = np.shape(x)
+    [HH, WW, _, F] = np.shape(w)
+    H_new = int(1 + (H + 2 * pad - HH) / stride)
+    W_new = int(1 + (W + 2 * pad - WW) / stride)
+    out = np.zeros((N, H_new, W_new, F))
+
+    for nn in range(N):
+    	for hh in range(0,H_new):
+    		for ww in range(0,W_new):
+    			for ff in range(F):
+    				out[nn,hh,ww,ff] = np.sum(x_padded[nn, hh*stride:hh*stride+HH, ww*stride:ww*stride+WW,:]*w[:,:,:,ff])+b[ff]
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -221,11 +237,28 @@ def max_pool_forward_naive(x, pool_param):
       H' = 1 + (H - pool_height) / stride
       W' = 1 + (W - pool_width) / stride
     """
-    out = None
     ###########################################################################
     # TODO: Implement the max-pooling forward pass                            #
     ###########################################################################
-    pass
+
+    pool_height = pool_param['pool_height']
+    pool_width = pool_param['pool_width']
+    stride = pool_param['stride']
+
+    [N, H, W, C] = np.shape(x)
+    HH = int(1 + (H - pool_height) / stride)
+    WW = int(1 + (W - pool_width) / stride)
+    out = np.zeros((N,HH,WW,C))
+
+    for nn in range(N):
+    	for hh in range(HH):
+    		for ww in range(WW):
+		    	for cc in range(C):
+
+	    			#print(x[nn,hh*stride:hh*stride+HH,ww*stride:ww*stride+WW,cc])
+    				out[nn,hh,ww,cc] = np.max(x[nn,hh*stride:hh*stride+HH,ww*stride:ww*stride+WW,cc])
+
+	#out = 
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################

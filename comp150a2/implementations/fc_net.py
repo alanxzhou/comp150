@@ -113,7 +113,7 @@ class FullyConnectedNet(object):
     else: 
       bn_update = []
     self.operations['bn_update'] = bn_update
-    tf.group([training_step,bn_update])
+    #tf.group([training_step,bn_update])
 
     # maintain a session for the entire model
     self.session = tf.Session()
@@ -343,8 +343,9 @@ class FullyConnectedNet(object):
  
 
      
-      np_objective, _ = session.run([self.operations['objective'], 
-                                     self.operations['training_step']], feed_dict=feed_dict)
+      np_objective, _, _  = session.run([self.operations['objective'], 
+                                     self.operations['training_step'],
+                                     self.operations['bn_update']], feed_dict=feed_dict)
 
       objective_history.append(np_objective) 
 

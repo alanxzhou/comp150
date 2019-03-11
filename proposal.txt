@@ -1,0 +1,10 @@
+comp150 proposal
+
+intro to problem
+formal def
+dataset
+model
+technical difficulties
+	e.g., model tuning, model development, etc.
+proposed work
+expected deliverable
