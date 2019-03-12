@@ -36,7 +36,7 @@ class ConvNet(object):
     self.options = {'centering_data':centering_data, 'use_dropout':use_dropout, 'use_bn':use_bn}
 
 
-    num_layers = len(filter_size) + len(fc_hidden_size) + 1
+    self.num_layers = len(filter_size) + len(fc_hidden_size) + 1
     hidden_size = [input_size] + np.shape(filter_size)[0]*[input_size]+fc_hidden_size+[output_size]
 
     #print(np.shape(filter_size))
@@ -50,7 +50,7 @@ class ConvNet(object):
             if ii+1 > jj:
                 hidden_size[ii+1][0:2] = [int(x/2) for x in hidden_size[ii+1][0:2]]
 
-    print('Hidden Size: %s' %hidden_size)
+    #print('Hidden Size: %s' %hidden_size)
 
     # get filter parameters
     filter_reshaped = np.reshape(filter_size,np.shape(filter_size)[:])
@@ -60,40 +60,42 @@ class ConvNet(object):
     # construct the computational graph 
     #self.tf_graph = tf.Graph()
     #with self.tf_graph.as_default():
+
     # allocate parameters
     self.params = {'W': [], 'b': [], 'filter': []}
 
+    # FC weights
 
-
-    for ilayer in range(num_layers): 
+    filter_counter = 0
+    for ilayer in range(self.num_layers): 
         # the scale of the initialization
 
         if weight_scale is None:
             weight_scale = np.sqrt(2 / np.product(hidden_size[ilayer]))
 
-        if ilayer == (num_layers - 1) or ilayer == (num_layers-2):
+        if ilayer == (self.num_layers - 1) or ilayer == (self.num_layers-2):
             #print('ilayer: %s' %hidden_size[ilayer])
             #print('ilayer + 1: %s' %hidden_size[ilayer+1])
             W = tf.Variable(weight_scale * np.random.randn(np.product(hidden_size[ilayer]), hidden_size[ilayer + 1]), dtype=tf.float32)
             b = tf.Variable(0.01 * np.ones(hidden_size[ilayer + 1]), dtype=tf.float32)
-            #self.params['W'].append(W)
-            #self.params['b'].append(b)
+            self.params['W'].append(W)
+            self.params['b'].append(b)
             #print('W shape: %s' %W.get_shape())
-            self.params['filter'].append(None)
 
         else:
-            filter_height,filter_width,out_channels = hidden_size[ilayer+1][0],hidden_size[ilayer+1][1],hidden_size[ilayer+1][2]
+            filter_height,filter_width,out_channels = filter_size[filter_counter][0],filter_size[filter_counter][1],hidden_size[ilayer+1][2]
             in_channels = hidden_size[ilayer][2]
             filter_shape = [filter_height,filter_width,in_channels,out_channels]
             #print(filter_shape)
-            W = tf.Variable(weight_scale*np.random.standard_normal(hidden_size[ilayer]), dtype=tf.float32)
-            b = tf.Variable(0.01*np.random.standard_normal(hidden_size[ilayer]), dtype=tf.float32)
-            current_filter = tf.Variable(weight_scale*np.random.standard_normal(filter_shape), dtype=tf.float32)
+            #W = tf.Variable(weight_scale*np.random.standard_normal(hidden_size[ilayer]), dtype=tf.float32)
+            #b = tf.Variable(0.01*np.random.standard_normal(hidden_size[ilayer]), dtype=tf.float32)
+            #current_filter = tf.Variable(weight_scale*np.random.standard_normal(filter_shape), dtype=tf.float32)
+            current_filter = tf.Variable(np.random.normal(size = filter_shape, scale = 10*weight_scale), dtype=tf.float32)
+
             #b = tf.Variable(0.01*np.random.standard_normal(filter_shape), dtype=tf.float32)
             self.params['filter'].append(current_filter)
+            filter_counter += 1
 
-        self.params['W'].append(W)
-        self.params['b'].append(b)
 
     # allocate convolutional parameters
     self.conv_params = {}
@@ -124,7 +126,6 @@ class ConvNet(object):
     # regularization weight 
     self.placeholders['reg_weight'] = tf.placeholder(dtype=tf.float32, shape=[])
 
-
     # learning rate
     self.placeholders['learning_rate'] = tf.placeholder(dtype=tf.float32, shape=[])
     
@@ -135,7 +136,6 @@ class ConvNet(object):
                             
     # predict operation
     self.operations['y_pred'] = tf.argmax(scores, axis=-1)
-
 
     # construct graph for training 
     objective = self.compute_objective(scores, self.placeholders['y_batch'])
@@ -175,10 +175,6 @@ class ConvNet(object):
     Returns:
     - loss: softmax loss for this batch of training samples.
     """
-    
-    # 
-    # Compute the loss
-
     softmax_loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=scores))
 
     return softmax_loss
@@ -192,8 +188,7 @@ class ConvNet(object):
     """
     reg = np.float32(0.0)
     for W in self.params['W']:
-        if W:
-            reg = reg + self.placeholders['reg_weight'] * tf.reduce_sum(tf.square(W))
+        reg = reg + self.placeholders['reg_weight'] * tf.reduce_sum(tf.square(W))
     
     return reg
 
@@ -215,33 +210,48 @@ class ConvNet(object):
     if self.options['centering_data']:  
         X = X - self.placeholders['x_center']
 
-    num_layers = len(self.params['W'])
+    #num_layers = len(self.params['W'])
 
     hidden = X
 
-    for ilayer in range(0, num_layers): 
-        W = self.params['W'][ilayer]
-        b = self.params['b'][ilayer]
-        W_filter = self.params['filter'][ilayer]
+    W_counter = 0
+    filter_counter = 0
+    for ilayer in range(0, self.num_layers): 
+        #print(ilayer)
+        #W = self.params['W'][ilayer]
+        #b = self.params['b'][ilayer]
+        #W_filter = self.params['filter'][ilayer]
         
         #print('hidden shape: %s' %hidden.get_shape())
         #print('W: %s' %W.get_shape())
         #linear_trans = tf.matmul(hidden, W) + b
 
         # if the last layer, then the linear transformation is the end
-        if ilayer > (num_layers - 3):
+        if ilayer > (self.num_layers - 3):
+
+            W = self.params['W'][W_counter]
+            b = self.params['b'][W_counter]
+            #print('Hidden Shape: %s' %hidden.get_shape())
+            #print('W Shape: %s' %W.get_shape())
+
             hidden = tf.layers.flatten(hidden)
             linear_trans = tf.matmul(hidden,W) + b
             hidden = linear_trans
+
+            W_counter += 1
 
         # otherwise optionally apply batch normalization, relu, and dropout to all layers 
         else:
 
             # convolutional layer
             #conv = tf.layers.conv2d(hidden,self.conv_params['filters'][ilayer],self.conv_params['kernel_sizes'][ilayer], padding = 'same')
-            print('Hidden Shape: %s' %hidden.get_shape())
-            print('W Shape: %s' %W.get_shape())
-            conv = tf.nn.conv2d(hidden,W_filter,[1,1,1,1],'SAME')
+            W_filter = self.params['filter'][filter_counter]
+
+            #print('Hidden Shape: %s' %hidden.get_shape())
+            #print('Filter Shape: %s' %W_filter.get_shape())
+            conv = tf.nn.conv2d(hidden,self.params['filter'][filter_counter],[1,1,1,1] ,'SAME')
+            #print('Output number of filters: %s' %self.conv_params['filters'][ilayer])
+            #print('Kernel size: %s' %self.conv_params['kernel_sizes'][ilayer])
             
             # batch normalization
             if self.options['use_bn']:
@@ -263,6 +273,8 @@ class ConvNet(object):
                 hidden = tf.layers.max_pooling2d(dropped,[2,2],2)
             else: 
                 hidden = dropped
+
+            filter_counter += 1
         
     scores = hidden
 
@@ -320,9 +332,10 @@ class ConvNet(object):
     num_train = X.shape[0]
     iterations_per_epoch = max(num_train / batch_size, 1)
     num_classes = self.params['b'][-1].get_shape()[0]
-    num_layers = len(self.params['W'])
+    #num_layers = len(self.params['W'])
 
     self.x_center = np.mean(X, axis=0)
+    self.params_loaded = {'W': [], 'b': [], 'filter': []}
 
     ############################################################################
     # after this line, you should execute appropriate operations in the graph to train the mode  
@@ -377,6 +390,9 @@ class ConvNet(object):
         train_acc_history.append(train_acc)
         val_acc_history.append(val_acc)
 
+    self.params_loaded['W'] = session.run(self.params['W'])
+    self.params_loaded['b'] = session.run(self.params['b'])
+    self.params_loaded['filter'] = session.run(self.params['filter'])
 
     return {
       'objective_history': objective_history,
@@ -412,6 +428,6 @@ class ConvNet(object):
     """
     Returns parameters of the network
     """
-    return(self.params)
+    return(self.params_loaded)
 
 
