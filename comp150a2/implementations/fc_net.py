@@ -101,19 +101,10 @@ class FullyConnectedNet(object):
     self.operations['training_step'] = training_step 
 
     if self.options['use_bn']:
-      #self.placeholders['running_mean'] = tf.placeholder(dtype=tf.float32, shape=[input_size])
-      #self.placeholders['running_variance'] = tf.placeholder(dtype=tf.float32, shape=[input_size])
-      #self.placeholders['batch_mean'] = tf.placeholder(dtype=tf.float32, shape=[input_size])
-      #self.placeholders['batch_variance'] = tf.placeholder(dtype=tf.float32, shape=[input_size])
-      #self.placeholders['gamma'] = tf.placeholder(dtype=tf.float32, shape=[])
-      #self.placeholders['beta'] = tf.placeholder(dtype=tf.float32, shape=[])
-      #self.placeholders['epsilon'] = tf.constant(dtype=tf.float32, value = 1e-6)
-      #self.placeholders['momentum'] = tf.constant(dtype=tf.float32, value = 0.95)
       bn_update = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     else: 
       bn_update = []
     self.operations['bn_update'] = bn_update
-    #tf.group([training_step,bn_update])
 
     # maintain a session for the entire model
     self.session = tf.Session()

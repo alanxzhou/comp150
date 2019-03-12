@@ -35,16 +35,22 @@ class ConvNet(object):
     # record all options
     self.options = {'centering_data':centering_data, 'use_dropout':use_dropout, 'use_bn':use_bn}
 
+
     num_layers = len(filter_size) + len(fc_hidden_size) + 1
-    hidden_size = [input_size] + np.shape(filter_size)[1]*[input_size]+fc_hidden_size+[output_size]
+    hidden_size = [input_size] + np.shape(filter_size)[0]*[input_size]+fc_hidden_size+[output_size]
+
+    #print(np.shape(filter_size))
+    #print(hidden_size)
 
     # adjust layer sizes to account for filter reshaping
-    n_filter_layers = np.shape(filter_size)[1]
+    n_filter_layers = np.shape(filter_size)[0]
     for ii in range(n_filter_layers):
         hidden_size[ii+1] = [input_size[0],input_size[1],filter_size[ii][-1]]
         for jj in pooling_schedule:
-            if ii+1 > jj-1:
+            if ii+1 > jj:
                 hidden_size[ii+1][0:2] = [int(x/2) for x in hidden_size[ii+1][0:2]]
+
+    print('Hidden Size: %s' %hidden_size)
 
     # get filter parameters
     filter_reshaped = np.reshape(filter_size,np.shape(filter_size)[:])
@@ -57,16 +63,32 @@ class ConvNet(object):
     # allocate parameters
     self.params = {'W': [], 'b': []}
 
-    PRINT(HII)
+
 
     for ilayer in range(num_layers): 
         # the scale of the initialization
-        if weight_scale is None:
-            print(hidden_size[ilayer])
-            weight_scale = np.sqrt(2 / hidden_size[ilayer])
 
-        W = tf.Variable(weight_scale * np.random.randn(hidden_size[ilayer], hidden_size[ilayer + 1]), dtype=tf.float32)
-        b = tf.Variable(0.01 * np.ones(hidden_size[ilayer + 1]), dtype=tf.float32)
+        if weight_scale is None:
+            weight_scale = np.sqrt(2 / np.product(hidden_size[ilayer]))
+        #print('ilayer: %s' %hidden_size[ilayer])
+        #print('ilayer + 1: %s' %hidden_size[ilayer+1])
+        if ilayer == (num_layers - 1) or ilayer == (num_layers-2):
+            #print('ilayer: %s' %hidden_size[ilayer])
+            #print('ilayer + 1: %s' %hidden_size[ilayer+1])
+            W = tf.Variable(weight_scale * np.random.randn(np.product(hidden_size[ilayer]), hidden_size[ilayer + 1]), dtype=tf.float32)
+            b = tf.Variable(0.01 * np.ones(hidden_size[ilayer + 1]), dtype=tf.float32)
+
+            #print('W shape: %s' %W.get_shape())
+
+        else:
+            filter_height,filter_width,out_channels = hidden_size[ilayer+1][0],hidden_size[ilayer+1][1],hidden_size[ilayer+1][2]
+            in_channels = hidden_size[ilayer][2]
+            filter_shape = [filter_height,filter_width,in_channels,out_channels]
+            #print(filter_shape)
+            #W = tf.Variable(weight_scale*np.random.standard_normal(hidden_size[ilayer]), dtype=tf.float32)
+            #b = tf.Variable(0.01*np.random.standard_normal(hidden_size[ilayer]), dtype=tf.float32)
+            W = tf.Variable(weight_scale*np.random.standard_normal(filter_shape), dtype=tf.float32)
+            b = tf.Variable(0.01*np.random.standard_normal(filter_shape), dtype=tf.float32)
 
         self.params['W'].append(W)
         self.params['b'].append(b)
@@ -85,14 +107,14 @@ class ConvNet(object):
     self.placeholders = {}
 
     # data feeder
-    self.placeholders['x_batch'] = tf.placeholder(dtype=tf.float32, shape=[None, input_size])
+    self.placeholders['x_batch'] = tf.placeholder(dtype=tf.float32, shape=np.hstack([None,input_size]))
     self.placeholders['y_batch']= tf.placeholder(dtype=tf.int32, shape=[None])
 
     # the working mode 
     self.placeholders['training_mode'] = tf.placeholder(dtype=tf.bool, shape=())
     
     # data center 
-    self.placeholders['x_center'] = tf.placeholder(dtype=tf.float32, shape=[input_size])
+    self.placeholders['x_center'] = tf.placeholder(dtype=tf.float32, shape=input_size)
 
     # keeping probability of the dropout layer
     self.placeholders['keep_prob'] = tf.placeholder(dtype=tf.float32, shape=[])
@@ -168,7 +190,8 @@ class ConvNet(object):
     """
     reg = np.float32(0.0)
     for W in self.params['W']:
-        reg = reg + self.placeholders['reg_weight'] * tf.reduce_sum(tf.square(W))
+        if W:
+            reg = reg + self.placeholders['reg_weight'] * tf.reduce_sum(tf.square(W))
     
     return reg
 
@@ -197,18 +220,25 @@ class ConvNet(object):
     for ilayer in range(0, num_layers): 
         W = self.params['W'][ilayer]
         b = self.params['b'][ilayer]
-                
-        linear_trans = tf.matmul(hidden, W) + b
+        
+        #print('hidden shape: %s' %hidden.get_shape())
+        #print('W: %s' %W.get_shape())
+        #linear_trans = tf.matmul(hidden, W) + b
 
         # if the last layer, then the linear transformation is the end
-        if ilayer == (num_layers - 1):
+        if ilayer > (num_layers - 3):
+            hidden = tf.layers.flatten(hidden)
+            linear_trans = tf.matmul(hidden,W) + b
             hidden = linear_trans
 
         # otherwise optionally apply batch normalization, relu, and dropout to all layers 
         else:
 
             # convolutional layer
-            conv = tf.layers.conv2(linear_trans,self.conv_params['filters'][ilayer],self.conv_params['kernel_sizes'][ilayer], padding = 'same')
+            conv = tf.layers.conv2d(hidden,self.conv_params['filters'][ilayer],self.conv_params['kernel_sizes'][ilayer], padding = 'same')
+            #print('Hidden Shape: %s' %hidden.get_shape())
+            #print('W Shape: %s' %W.get_shape())
+            #conv = tf.nn.conv2d(hidden,W,[1,1,1,1],'SAME')
             
             # batch normalization
             if self.options['use_bn']:
@@ -226,11 +256,10 @@ class ConvNet(object):
               dropped = relu
 
             # pooling
-            if ilayer+1 in self.conv_params['pooling_schedule']:
-                hidden = tf.layers.max_pooling2d(dropped,[2,2],1)
-            else: hidden = dropped
-
-            hidden = dropped
+            if ilayer in self.conv_params['pooling_schedule']:
+                hidden = tf.layers.max_pooling2d(dropped,[2,2],2)
+            else: 
+                hidden = dropped
         
     scores = hidden
 
