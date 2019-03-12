@@ -61,7 +61,7 @@ class ConvNet(object):
     #self.tf_graph = tf.Graph()
     #with self.tf_graph.as_default():
     # allocate parameters
-    self.params = {'W': [], 'b': []}
+    self.params = {'W': [], 'b': [], 'filter': []}
 
 
 
@@ -70,25 +70,27 @@ class ConvNet(object):
 
         if weight_scale is None:
             weight_scale = np.sqrt(2 / np.product(hidden_size[ilayer]))
-        #print('ilayer: %s' %hidden_size[ilayer])
-        #print('ilayer + 1: %s' %hidden_size[ilayer+1])
+
         if ilayer == (num_layers - 1) or ilayer == (num_layers-2):
             #print('ilayer: %s' %hidden_size[ilayer])
             #print('ilayer + 1: %s' %hidden_size[ilayer+1])
             W = tf.Variable(weight_scale * np.random.randn(np.product(hidden_size[ilayer]), hidden_size[ilayer + 1]), dtype=tf.float32)
             b = tf.Variable(0.01 * np.ones(hidden_size[ilayer + 1]), dtype=tf.float32)
-
+            #self.params['W'].append(W)
+            #self.params['b'].append(b)
             #print('W shape: %s' %W.get_shape())
+            self.params['filter'].append(None)
 
         else:
             filter_height,filter_width,out_channels = hidden_size[ilayer+1][0],hidden_size[ilayer+1][1],hidden_size[ilayer+1][2]
             in_channels = hidden_size[ilayer][2]
             filter_shape = [filter_height,filter_width,in_channels,out_channels]
             #print(filter_shape)
-            #W = tf.Variable(weight_scale*np.random.standard_normal(hidden_size[ilayer]), dtype=tf.float32)
-            #b = tf.Variable(0.01*np.random.standard_normal(hidden_size[ilayer]), dtype=tf.float32)
-            W = tf.Variable(weight_scale*np.random.standard_normal(filter_shape), dtype=tf.float32)
-            b = tf.Variable(0.01*np.random.standard_normal(filter_shape), dtype=tf.float32)
+            W = tf.Variable(weight_scale*np.random.standard_normal(hidden_size[ilayer]), dtype=tf.float32)
+            b = tf.Variable(0.01*np.random.standard_normal(hidden_size[ilayer]), dtype=tf.float32)
+            current_filter = tf.Variable(weight_scale*np.random.standard_normal(filter_shape), dtype=tf.float32)
+            #b = tf.Variable(0.01*np.random.standard_normal(filter_shape), dtype=tf.float32)
+            self.params['filter'].append(current_filter)
 
         self.params['W'].append(W)
         self.params['b'].append(b)
@@ -220,6 +222,7 @@ class ConvNet(object):
     for ilayer in range(0, num_layers): 
         W = self.params['W'][ilayer]
         b = self.params['b'][ilayer]
+        W_filter = self.params['filter'][ilayer]
         
         #print('hidden shape: %s' %hidden.get_shape())
         #print('W: %s' %W.get_shape())
@@ -235,10 +238,10 @@ class ConvNet(object):
         else:
 
             # convolutional layer
-            conv = tf.layers.conv2d(hidden,self.conv_params['filters'][ilayer],self.conv_params['kernel_sizes'][ilayer], padding = 'same')
-            #print('Hidden Shape: %s' %hidden.get_shape())
-            #print('W Shape: %s' %W.get_shape())
-            #conv = tf.nn.conv2d(hidden,W,[1,1,1,1],'SAME')
+            #conv = tf.layers.conv2d(hidden,self.conv_params['filters'][ilayer],self.conv_params['kernel_sizes'][ilayer], padding = 'same')
+            print('Hidden Shape: %s' %hidden.get_shape())
+            print('W Shape: %s' %W.get_shape())
+            conv = tf.nn.conv2d(hidden,W_filter,[1,1,1,1],'SAME')
             
             # batch normalization
             if self.options['use_bn']:
@@ -404,5 +407,11 @@ class ConvNet(object):
                                                                        )
 
     return np_y_pred
+
+  def get_params(self):
+    """
+    Returns parameters of the network
+    """
+    return(self.params)
 
 
