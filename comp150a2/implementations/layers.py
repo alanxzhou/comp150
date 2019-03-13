@@ -256,7 +256,7 @@ def max_pool_forward_naive(x, pool_param):
 		    	for cc in range(C):
 
 	    			#print(x[nn,hh*stride:hh*stride+HH,ww*stride:ww*stride+WW,cc])
-    				out[nn,hh,ww,cc] = np.max(x[nn,hh*stride:hh*stride+HH,ww*stride:ww*stride+WW,cc])
+    				out[nn,hh,ww,ccw] = np.max(x[nn,hh*stride:hh*stride+HH,ww*stride:ww*stride+WW,cc])
 
 	#out = 
     ###########################################################################

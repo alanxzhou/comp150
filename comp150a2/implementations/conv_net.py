@@ -74,25 +74,17 @@ class ConvNet(object):
             weight_scale = np.sqrt(2 / np.product(hidden_size[ilayer]))
 
         if ilayer == (self.num_layers - 1) or ilayer == (self.num_layers-2):
-            #print('ilayer: %s' %hidden_size[ilayer])
-            #print('ilayer + 1: %s' %hidden_size[ilayer+1])
             W = tf.Variable(weight_scale * np.random.randn(np.product(hidden_size[ilayer]), hidden_size[ilayer + 1]), dtype=tf.float32)
             b = tf.Variable(0.01 * np.ones(hidden_size[ilayer + 1]), dtype=tf.float32)
             self.params['W'].append(W)
             self.params['b'].append(b)
-            #print('W shape: %s' %W.get_shape())
 
         else:
             filter_height,filter_width,out_channels = filter_size[filter_counter][0],filter_size[filter_counter][1],hidden_size[ilayer+1][2]
             in_channels = hidden_size[ilayer][2]
             filter_shape = [filter_height,filter_width,in_channels,out_channels]
-            #print(filter_shape)
-            #W = tf.Variable(weight_scale*np.random.standard_normal(hidden_size[ilayer]), dtype=tf.float32)
-            #b = tf.Variable(0.01*np.random.standard_normal(hidden_size[ilayer]), dtype=tf.float32)
-            #current_filter = tf.Variable(weight_scale*np.random.standard_normal(filter_shape), dtype=tf.float32)
-            current_filter = tf.Variable(np.random.normal(size = filter_shape, scale = 10*weight_scale), dtype=tf.float32)
 
-            #b = tf.Variable(0.01*np.random.standard_normal(filter_shape), dtype=tf.float32)
+            current_filter = tf.Variable(np.random.normal(size = filter_shape, scale = 10*weight_scale), dtype=tf.float32)
             self.params['filter'].append(current_filter)
             filter_counter += 1
 
@@ -247,11 +239,7 @@ class ConvNet(object):
             #conv = tf.layers.conv2d(hidden,self.conv_params['filters'][ilayer],self.conv_params['kernel_sizes'][ilayer], padding = 'same')
             W_filter = self.params['filter'][filter_counter]
 
-            #print('Hidden Shape: %s' %hidden.get_shape())
-            #print('Filter Shape: %s' %W_filter.get_shape())
             conv = tf.nn.conv2d(hidden,self.params['filter'][filter_counter],[1,1,1,1] ,'SAME')
-            #print('Output number of filters: %s' %self.conv_params['filters'][ilayer])
-            #print('Kernel size: %s' %self.conv_params['kernel_sizes'][ilayer])
             
             # batch normalization
             if self.options['use_bn']:
