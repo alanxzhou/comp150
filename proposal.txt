@@ -8,3 +8,8 @@ technical difficulties
 	e.g., model tuning, model development, etc.
 proposed work
 expected deliverable
+
+prediction:
+	yes or no storm
+	2d location on earth
+loss: 
