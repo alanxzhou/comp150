@@ -22,8 +22,14 @@ def rnn(wt_h, wt_x, bias, init_state, input_data):
         final_state: the final hidden state
     """
 
-    outputs = None
-    final_state = None
+    data_term = np.dot(input_data,wt_x)
+    hidden_term = np.dot(init_state,wt_h)
+
+    for ii in range(np.shape(data_term)[1]):
+        data_term[:,ii,:] += hidden_term
+
+    outputs = sigmoid(data_term + bias)
+    final_state = outputs[:, -1, :]
     
     ##################################################################################################
     # Please implement the basic RNN here. You don't need to considier computational efficiency.     #
