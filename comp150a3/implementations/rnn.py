@@ -28,6 +28,10 @@ def rnn(wt_h, wt_x, bias, init_state, input_data):
 #    for ii in range(np.shape(data_term)[1]):
 #        data_term[:,ii,:] += hidden_term
 
+    batch_size, time_steps, _ = np.shape(input_data)
+    hidden_size = np.shape(bias)
+    outputs = np.zeros((batch_size,time_steps,hidden_size[0]))
+
     nsteps = np.shape(input_data)[1] # number of time steps
 
     for ii in range(nsteps):
