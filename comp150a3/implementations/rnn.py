@@ -59,11 +59,11 @@ def gru(wtu_h, wtu_x, biasu, wtr_h, wtr_x, biasr, wtc_h, wtc_x, biasc, init_stat
         wtr_h: shape [hidden_size, hidden_size], weight matrix for hidden state transformation for r gate
         wtr_x: shape [input_size, hidden_size], weight matrix for input transformation for r gate
         biasr: shape [hidden_size], bias term for r gate
-        wtc_h: shape [hidden_size, hidden_size], weight matrix for hidden state transformation for candicate
+        wtc_h: shape [hidden_size, hidden_size], weight matrix for hidden state transformation for candidate
                hidden state calculation
-        wtc_x: shape [input_size, hidden_size], weight matrix for input transformation for candicate
+        wtc_x: shape [input_size, hidden_size], weight matrix for input transformation for candidate
                hidden state calculation
-        biasc: shape [hidden_size], bias term for candicate hidden state calculation
+        biasc: shape [hidden_size], bias term for candidate hidden state calculation
         init_state: shape [hidden_size], the initial state of the RNN
         input_data: shape [batch_size, time_steps, input_size], input data of `batch_size` sequences, each of
                     which has length `time_steps` and `input_size` features at each time step. 
@@ -73,8 +73,25 @@ def gru(wtu_h, wtu_x, biasu, wtr_h, wtr_x, biasr, wtc_h, wtc_x, biasc, init_stat
         final_state: the final hidden state
     """
 
-    outputs = None
-    final_state = None
+    batch_size, time_steps, _ = np.shape(input_data)
+    hidden_size = np.shape(biasc)
+    outputs = np.zeros((batch_size,time_steps,hidden_size[0]))
+
+    nsteps = np.shape(input_data)[1]
+
+    #print(np.shape(init_state))
+    #print(np.shape(biasc))
+    #print(np.shape(input_data[:,1,:]))
+
+    for ii in range(nsteps):
+        u = sigmoid(np.dot(init_state,wtu_h)+np.dot(input_data[:,ii,:],wtu_x)+biasu)
+        r = sigmoid(np.dot(init_state,wtr_h)+np.dot(input_data[:,ii,:],wtr_x)+biasr)
+
+        h_hat = np.tanh(np.dot(input_data[:,ii,:],wtc_x)+np.dot((r*init_state),wtc_h)+biasc)
+        init_state = u*init_state+(1-u)*h_hat
+        outputs[:,ii,:] = init_state
+
+    final_state = outputs[:,-1,:]
     ##################################################################################################
     # Please implement an RNN with GRU here. You don't need to considier computational efficiency.   #
     ##################################################################################################
