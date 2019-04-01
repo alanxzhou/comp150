@@ -80,7 +80,8 @@ class RNNLM_Model(LanguageModel):
     """
     ### YOUR CODE HERE
     self.input_placeholder = tf.placeholder(tf.int32, shape = [None, self.config.num_steps])
-    self.labels_placeholder = tf.placeholder(tf.float32, shape = [None, self.config.num_steps])
+    self.labels_placeholder = tf.placeholder(tf.int32, shape = [None, self.config.num_steps]) #int32 made this work in add_loss_op
+    self.loss_weights = tf.placeholder(tf.float32,shape = [None, self.config.num_steps])
     self.dropout_placeholder = tf.placeholder(tf.float32, shape = ())
     ### END YOUR CODE
   
@@ -106,11 +107,19 @@ class RNNLM_Model(LanguageModel):
     inputs = []
 
     # The embedding lookup is currently only implemented for the CPU
+    split = tf.split(self.input_placeholder,self.config.num_steps,axis = 1)
     with tf.device('/cpu:0'):
       ### YOUR CODE HERE
-      embed = tf.nn.embedding_lookup(L, self.input_placeholder)
+      for ii in range(self.config.num_steps):
+        #print(split[ii].get_shape())
+        embed = tf.nn.embedding_lookup(L,split[ii])
+        #print(embed[:,0,:].get_shape())
+        #print(tf.reshape(embed,[-1]).get_shape())
+        #print(tf.squeeze(embed).get_shape())
+        #return
+        #embed = tf.nn.embedding_lookup(L, self.input_placeholder)
 
-      inputs.append(embed)      
+        inputs.append(embed)      
 
       #raise NotImplementedError
       ### END YOUR CODE
@@ -131,12 +140,27 @@ class RNNLM_Model(LanguageModel):
     Args:
       rnn_outputs: List of length num_steps, each of whose elements should be
                    a tensor of shape (batch_size, embed_size).
+                   This might be (batch_size, hidden_size)
     Returns:
       outputs: List of length num_steps, each a tensor of shape
                (batch_size, len(vocab)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    hidden_size = self.config.hidden_size
+    U = tf.placeholder(tf.float32, shape = [hidden_size,len(self.vocab)])
+    b_2 = tf.placeholder(tf.float32, shape = len(self.vocab))
+    outputs = []
+
+    #print(rnn_outputs)
+    for rnn_output in rnn_outputs:
+      #print(rnn_output.get_shape())
+      #print(U.get_shape())
+      #rnn_output = tf.squeeze(rnn_output)
+      rnn_output = tf.reshape(rnn_output,[self.config.batch_size,hidden_size])
+
+      #tf.matmul(tf.squeeze(rnn_output),U)
+      outputs.append(tf.matmul(rnn_output,U)+b_2)
+
     ### END YOUR CODE
     return outputs
 
@@ -151,7 +175,9 @@ class RNNLM_Model(LanguageModel):
       loss: A 0-d tensor (scalar)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    #print(output.get_shape())
+    loss = tf.contrib.seq2seq.sequence_loss(output, self.labels_placeholder, self.loss_weights)
+    #loss = None
     ### END YOUR CODE
     return loss
 
@@ -175,7 +201,10 @@ class RNNLM_Model(LanguageModel):
       train_op: The Op for training.
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    print(loss)
+    with tf.variable_scope(tf.get_variable_scope(),reuse=False): 
+      train_op = tf.train.AdamOptimizer().minimize(loss)
+
     ### END YOUR CODE
     return train_op
   
@@ -187,6 +216,7 @@ class RNNLM_Model(LanguageModel):
     self.inputs = self.add_embedding()
     self.rnn_outputs = self.add_model(self.inputs)
     self.outputs = self.add_projection(self.rnn_outputs)
+
   
     # We want to check how well we correctly predict the next word
     # We cast o to float64 as there are numerical issues at hand
@@ -194,7 +224,8 @@ class RNNLM_Model(LanguageModel):
     self.predictions = [tf.nn.softmax(tf.cast(o, 'float64')) for o in self.outputs]
     # Reshape the output into len(vocab) sized chunks - the -1 says as many as
     # needed to evenly divide
-    output = tf.reshape(tf.concat(1, self.outputs), [-1, len(self.vocab)])
+    #output = tf.reshape(tf.concat(self.outputs,1), [-1, len(self.vocab)])
+    output = tf.reshape(tf.concat(self.outputs,1), [self.config.batch_size, self.config.num_steps,len(self.vocab)])
     self.calculate_loss = self.add_loss_op(output)
     self.train_step = self.add_training_op(self.calculate_loss)
 
@@ -250,15 +281,26 @@ class RNNLM_Model(LanguageModel):
     I = tf.placeholder(tf.float32, shape = [embed_size, hidden_size])
     b_1 = tf.placeholder(tf.float32, shape = hidden_size)
     rnn_outputs = []
-
     rnn_cell = tf.nn.rnn_cell.BasicRNNCell(hidden_size)
-    for batch in inputs:
-      rnn_output, rnn_final_state = tf.nn.dynamic_rnn(rnn_cell, batch,
-                                     initial_state=self.initial_state,
-                                     dtype=tf.float32)
-      rnn_outputs.append(rnn_output)
 
-    self.final_state = rnn_final_state
+    with tf.variable_scope("RNN"):
+      for timestep, input_t in enumerate(inputs):
+        batch = inputs[timestep]
+        rnn_output, rnn_final_state = tf.nn.dynamic_rnn(rnn_cell, batch,
+                                       initial_state=self.initial_state,
+                                       dtype=tf.float32)
+        if timestep > 0:
+          tf.get_variable_scope().reuse_variables()
+        with tf.variable_scope("BasicRNNCell"):
+          rnn_outputs.append(rnn_output)
+
+#      for batch in inputs:
+#        rnn_output, rnn_final_state = tf.nn.dynamic_rnn(rnn_cell, batch,
+#                                       initial_state=self.initial_state,
+#                                       dtype=tf.float32)
+#        rnn_outputs.append(rnn_output)
+#
+#      self.final_state = rnn_final_state
 
     ### END YOUR CODE
     return rnn_outputs
