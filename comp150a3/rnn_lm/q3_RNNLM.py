@@ -79,7 +79,9 @@ class RNNLM_Model(LanguageModel):
     (Don't change the variable names)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    self.input_placeholder = tf.placeholder(tf.int32, shape = [None, self.config.num_steps])
+    self.labels_placeholder = tf.placeholder(tf.float32, shape = [None, self.config.num_steps])
+    self.dropout_placeholder = tf.placeholder(tf.float32, shape = ())
     ### END YOUR CODE
   
   def add_embedding(self):
@@ -98,10 +100,19 @@ class RNNLM_Model(LanguageModel):
       inputs: List of length num_steps, each of whose elements should be
               a tensor of shape (batch_size, embed_size).
     """
+
+    #L = tf.Variable(tf.random_uniform([len(self.vocab), self.config.embed_size], -1.0, 1.0))
+    L = tf.placeholder(tf.float32, shape = [len(self.vocab), self.config.embed_size])
+    inputs = []
+
     # The embedding lookup is currently only implemented for the CPU
     with tf.device('/cpu:0'):
       ### YOUR CODE HERE
-      raise NotImplementedError
+      embed = tf.nn.embedding_lookup(L, self.input_placeholder)
+
+      inputs.append(embed)      
+
+      #raise NotImplementedError
       ### END YOUR CODE
       return inputs
 
@@ -169,6 +180,7 @@ class RNNLM_Model(LanguageModel):
     return train_op
   
   def __init__(self, config):
+    #tf.reset_default_graph()
     self.config = config
     self.load_data(debug=False)
     self.add_placeholders()
@@ -226,7 +238,28 @@ class RNNLM_Model(LanguageModel):
                a tensor of shape (batch_size, hidden_size)
     """
     ### YOUR CODE HERE
-    raise NotImplementedError
+    batch_size = self.config.batch_size
+    hidden_size = self.config.hidden_size
+    embed_size = self.config.embed_size
+
+    # create variables
+    init_state = np.zeros([batch_size, hidden_size]) 
+    self.initial_state = tf.Variable(init_state, dtype=tf.float32)
+    #self.final_state = tf.placeholder(tf.float32, shape = tf.shape(self.initial_state))
+    H = tf.placeholder(tf.float32, shape = [hidden_size,hidden_size])
+    I = tf.placeholder(tf.float32, shape = [embed_size, hidden_size])
+    b_1 = tf.placeholder(tf.float32, shape = hidden_size)
+    rnn_outputs = []
+
+    rnn_cell = tf.nn.rnn_cell.BasicRNNCell(hidden_size)
+    for batch in inputs:
+      rnn_output, rnn_final_state = tf.nn.dynamic_rnn(rnn_cell, batch,
+                                     initial_state=self.initial_state,
+                                     dtype=tf.float32)
+      rnn_outputs.append(rnn_output)
+
+    self.final_state = rnn_final_state
+
     ### END YOUR CODE
     return rnn_outputs
 
@@ -303,6 +336,7 @@ def test_RNNLM():
   gen_config.batch_size = gen_config.num_steps = 1
 
   # We create the training model and generative model
+  tf.reset_default_graph()
   with tf.variable_scope('RNNLM') as scope:
     model = RNNLM_Model(config)
     # This instructs gen_model to reuse the same variables as the model above
