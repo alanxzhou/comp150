@@ -81,7 +81,8 @@ class RNNLM_Model(LanguageModel):
     ### YOUR CODE HERE
     self.input_placeholder = tf.placeholder(tf.int32, shape = [None, self.config.num_steps])
     self.labels_placeholder = tf.placeholder(tf.int32, shape = [None, self.config.num_steps]) #int32 made this work in add_loss_op
-    self.loss_weights = tf.placeholder(tf.float32,shape = [None, self.config.num_steps])
+    #self.loss_weights = tf.placeholder(tf.float32,shape = [None, self.config.num_steps])
+    self.loss_weights = tf.ones([self.config.batch_size,self.config.num_steps])
     self.dropout_placeholder = tf.placeholder(tf.float32, shape = ())
     ### END YOUR CODE
   
@@ -102,8 +103,8 @@ class RNNLM_Model(LanguageModel):
               a tensor of shape (batch_size, embed_size).
     """
 
-    #L = tf.Variable(tf.random_uniform([len(self.vocab), self.config.embed_size], -1.0, 1.0))
-    L = tf.placeholder(tf.float32, shape = [len(self.vocab), self.config.embed_size])
+    L = tf.Variable(tf.random_uniform([len(self.vocab), self.config.embed_size], -1.0, 1.0))
+    #L = tf.placeholder(tf.float32, shape = [len(self.vocab), self.config.embed_size])
     inputs = []
 
     # The embedding lookup is currently only implemented for the CPU
@@ -111,124 +112,13 @@ class RNNLM_Model(LanguageModel):
     with tf.device('/cpu:0'):
       ### YOUR CODE HERE
       for ii in range(self.config.num_steps):
-        #print(split[ii].get_shape())
         embed = tf.nn.embedding_lookup(L,split[ii])
-        #print(embed[:,0,:].get_shape())
-        #print(tf.reshape(embed,[-1]).get_shape())
-        #print(tf.squeeze(embed).get_shape())
-        #return
         #embed = tf.nn.embedding_lookup(L, self.input_placeholder)
 
         inputs.append(embed)      
 
-      #raise NotImplementedError
       ### END YOUR CODE
       return inputs
-
-  def add_projection(self, rnn_outputs):
-    """Adds a projection layer.
-
-    The projection layer transforms the hidden representation to a distribution
-    over the vocabulary.
-
-    Hint: Here are the dimensions of the variables you will need to
-          create 
-          
-          U:   (hidden_size, len(vocab))
-          b_2: (len(vocab),)
-
-    Args:
-      rnn_outputs: List of length num_steps, each of whose elements should be
-                   a tensor of shape (batch_size, embed_size).
-                   This might be (batch_size, hidden_size)
-    Returns:
-      outputs: List of length num_steps, each a tensor of shape
-               (batch_size, len(vocab)
-    """
-    ### YOUR CODE HERE
-    hidden_size = self.config.hidden_size
-    U = tf.placeholder(tf.float32, shape = [hidden_size,len(self.vocab)])
-    b_2 = tf.placeholder(tf.float32, shape = len(self.vocab))
-    outputs = []
-
-    #print(rnn_outputs)
-    for rnn_output in rnn_outputs:
-      #print(rnn_output.get_shape())
-      #print(U.get_shape())
-      #rnn_output = tf.squeeze(rnn_output)
-      rnn_output = tf.reshape(rnn_output,[self.config.batch_size,hidden_size])
-
-      #tf.matmul(tf.squeeze(rnn_output),U)
-      outputs.append(tf.matmul(rnn_output,U)+b_2)
-
-    ### END YOUR CODE
-    return outputs
-
-  def add_loss_op(self, output):
-    """Adds loss ops to the computational graph.
-
-    Hint: Use tensorflow.python.ops.seq2seq.sequence_loss to implement sequence loss. 
-
-    Args:
-      output: A tensor of shape (None, self.vocab)
-    Returns:
-      loss: A 0-d tensor (scalar)
-    """
-    ### YOUR CODE HERE
-    #print(output.get_shape())
-    loss = tf.contrib.seq2seq.sequence_loss(output, self.labels_placeholder, self.loss_weights)
-    #loss = None
-    ### END YOUR CODE
-    return loss
-
-  def add_training_op(self, loss):
-    """Sets up the training Ops.
-
-    Creates an optimizer and applies the gradients to all trainable variables.
-    The Op returned by this function is what must be passed to the
-    `sess.run()` call to cause the model to train. See 
-
-    https://www.tensorflow.org/versions/r0.7/api_docs/python/train.html#Optimizer
-
-    for more information.
-
-    Hint: Use tf.train.AdamOptimizer for this model.
-          Calling optimizer.minimize() will return a train_op object.
-
-    Args:
-      loss: Loss tensor, from cross_entropy_loss.
-    Returns:
-      train_op: The Op for training.
-    """
-    ### YOUR CODE HERE
-    #print(loss)
-    with tf.variable_scope(tf.get_variable_scope(),reuse=tf.AUTO_REUSE): 
-      train_op = tf.train.AdamOptimizer().minimize(loss)
-
-    ### END YOUR CODE
-    return train_op
-  
-  def __init__(self, config):
-    #tf.reset_default_graph()
-    self.config = config
-    self.load_data(debug=False)
-    self.add_placeholders()
-    self.inputs = self.add_embedding()
-    self.rnn_outputs = self.add_model(self.inputs)
-    self.outputs = self.add_projection(self.rnn_outputs)
-
-  
-    # We want to check how well we correctly predict the next word
-    # We cast o to float64 as there are numerical issues at hand
-    # (i.e. sum(output of softmax) = 1.00000298179 and not 1)
-    self.predictions = [tf.nn.softmax(tf.cast(o, 'float64')) for o in self.outputs]
-    # Reshape the output into len(vocab) sized chunks - the -1 says as many as
-    # needed to evenly divide
-    #output = tf.reshape(tf.concat(self.outputs,1), [-1, len(self.vocab)])
-    output = tf.reshape(tf.concat(self.outputs,1), [self.config.batch_size, self.config.num_steps,len(self.vocab)])
-    self.calculate_loss = self.add_loss_op(output)
-    self.train_step = self.add_training_op(self.calculate_loss)
-
 
   def add_model(self, inputs):
     """Creates the RNN LM model.
@@ -275,9 +165,10 @@ class RNNLM_Model(LanguageModel):
 
     # create variables
     init_state = np.zeros([batch_size, hidden_size]) 
-    self.initial_state = tf.placeholder(tf.float32, shape = [batch_size, hidden_size])
-    #self.initial_state = tf.Variable(init_state, dtype=tf.float32)
+    self.initial_state = tf.Variable(init_state, dtype=tf.float32)
+    #self.initial_state = tf.placeholder(tf.float32, shape = [batch_size, hidden_size])
     #self.final_state = tf.placeholder(tf.float32, shape = tf.shape(self.initial_state))
+    #self.initial_state = tf.zeros(tf.float32, shape = [batch_size, hidden_size])
     H = tf.placeholder(tf.float32, shape = [hidden_size,hidden_size])
     I = tf.placeholder(tf.float32, shape = [embed_size, hidden_size])
     b_1 = tf.placeholder(tf.float32, shape = hidden_size)
@@ -306,6 +197,110 @@ class RNNLM_Model(LanguageModel):
     ### END YOUR CODE
     return rnn_outputs
 
+  def add_projection(self, rnn_outputs):
+    """Adds a projection layer.
+
+    The projection layer transforms the hidden representation to a distribution
+    over the vocabulary.
+
+    Hint: Here are the dimensions of the variables you will need to
+          create 
+          
+          U:   (hidden_size, len(vocab))
+          b_2: (len(vocab),)
+
+    Args:
+      rnn_outputs: List of length num_steps, each of whose elements should be
+                   a tensor of shape (batch_size, embed_size).
+                   This might be (batch_size, hidden_size)
+    Returns:
+      outputs: List of length num_steps, each a tensor of shape
+               (batch_size, len(vocab)
+    """
+    ### YOUR CODE HERE
+    hidden_size = self.config.hidden_size
+    U = tf.Variable(tf.random_uniform([hidden_size,len(self.vocab)],-1.0,1.0))
+    b_2 = tf.Variable(tf.random_uniform([len(self.vocab)],-1.0,1.0))
+    #U = tf.placeholder(tf.float32, shape = [hidden_size,len(self.vocab)])
+    #b_2 = tf.placeholder(tf.float32, shape = len(self.vocab))
+    outputs = []
+
+    for rnn_output in rnn_outputs:
+      rnn_output = tf.reshape(rnn_output,[self.config.batch_size,hidden_size])
+      output = tf.matmul(rnn_output,U)+b_2
+      outputs.append(output)
+
+    ### END YOUR CODE
+    return outputs
+
+  def add_loss_op(self, output):
+    """Adds loss ops to the computational graph.
+
+    Hint: Use tensorflow.python.ops.seq2seq.sequence_loss to implement sequence loss. 
+
+    Args:
+      output: A tensor of shape (None, self.vocab)
+    Returns:
+      loss: A 0-d tensor (scalar)
+    """
+    ### YOUR CODE HERE
+    #print(output.get_shape())
+    loss = tf.contrib.seq2seq.sequence_loss(output, self.labels_placeholder, self.loss_weights)
+    print(loss.get_shape())
+
+    #loss = tf.contrib.seq2seq.sequence_loss(output, self.labels_placeholder, self.loss_weights)
+    #print(loss)
+    #loss = None
+    ### END YOUR CODE
+    return loss
+
+  def add_training_op(self, loss):
+    """Sets up the training Ops.
+
+    Creates an optimizer and applies the gradients to all trainable variables.
+    The Op returned by this function is what must be passed to the
+    `sess.run()` call to cause the model to train. See 
+
+    https://www.tensorflow.org/versions/r0.7/api_docs/python/train.html#Optimizer
+
+    for more information.
+
+    Hint: Use tf.train.AdamOptimizer for this model.
+          Calling optimizer.minimize() will return a train_op object.
+
+    Args:
+      loss: Loss tensor, from cross_entropy_loss.
+    Returns:
+      train_op: The Op for training.
+    """
+    ### YOUR CODE HERE
+    #with tf.variable_scope(tf.get_variable_scope(),reuse=tf.AUTO_REUSE):
+    with tf.variable_scope("RNN", reuse = tf.AUTO_REUSE):
+      train_op = tf.train.AdamOptimizer().minimize(loss)
+      print(train_op)
+
+    ### END YOUR CODE
+    return train_op
+
+  def __init__(self, config):
+    #tf.reset_default_graph()
+    self.config = config
+    self.load_data(debug=False)
+    self.add_placeholders()
+    self.inputs = self.add_embedding()
+    self.rnn_outputs = self.add_model(self.inputs)
+    self.outputs = self.add_projection(self.rnn_outputs)
+    # We want to check how well we correctly predict the next word
+    # We cast o to float64 as there are numerical issues at hand
+    # (i.e. sum(output of softmax) = 1.00000298179 and not 1)
+    self.predictions = [tf.nn.softmax(tf.cast(o, 'float32')) for o in self.outputs]
+    self.predictions = tf.reshape(tf.concat(self.predictions,0),[self.config.batch_size, self.config.num_steps,len(self.vocab)])
+    # Reshape the output into len(vocab) sized chunks - the -1 says as many as
+    # needed to evenly divide
+    #output = tf.reshape(tf.concat(self.outputs,1), [-1, len(self.vocab)])
+    output = tf.reshape(tf.concat(self.outputs,1), [self.config.batch_size, self.config.num_steps, len(self.vocab)])
+    self.calculate_loss = self.add_loss_op(self.predictions)
+    self.train_step = self.add_training_op(self.calculate_loss)
 
   def run_epoch(self, session, data, train_op=None, verbose=10):
     config = self.config
@@ -323,7 +318,13 @@ class RNNLM_Model(LanguageModel):
       feed = {self.input_placeholder: x,
               self.labels_placeholder: y,
               self.initial_state: state,
-              self.dropout_placeholder: dp}
+              self.dropout_placeholder: dp,}
+
+      ######testing#######
+      #loss = session.run(self.calculate_loss, feed_dict=feed)
+      #state = session.run(self.final_state, feed_dict=feed)
+      #session.run(train_op, feed_dict=feed) # error with this one
+      ####################
       loss, state, _ = session.run(
           [self.calculate_loss, self.final_state, train_op], feed_dict=feed)
       total_loss.append(loss)
@@ -397,9 +398,7 @@ def test_RNNLM():
     for epoch in range(Config.max_epochs):
       print('Epoch {}'.format(epoch))
       start = time.time()
-      ###
 
-      print(model.train_step)
       train_pp = model.run_epoch(
           session, model.encoded_train,
           train_op=model.train_step)
