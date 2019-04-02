@@ -201,8 +201,8 @@ class RNNLM_Model(LanguageModel):
       train_op: The Op for training.
     """
     ### YOUR CODE HERE
-    print(loss)
-    with tf.variable_scope(tf.get_variable_scope(),reuse=False): 
+    #print(loss)
+    with tf.variable_scope(tf.get_variable_scope(),reuse=tf.AUTO_REUSE): 
       train_op = tf.train.AdamOptimizer().minimize(loss)
 
     ### END YOUR CODE
@@ -275,7 +275,8 @@ class RNNLM_Model(LanguageModel):
 
     # create variables
     init_state = np.zeros([batch_size, hidden_size]) 
-    self.initial_state = tf.Variable(init_state, dtype=tf.float32)
+    self.initial_state = tf.placeholder(tf.float32, shape = [batch_size, hidden_size])
+    #self.initial_state = tf.Variable(init_state, dtype=tf.float32)
     #self.final_state = tf.placeholder(tf.float32, shape = tf.shape(self.initial_state))
     H = tf.placeholder(tf.float32, shape = [hidden_size,hidden_size])
     I = tf.placeholder(tf.float32, shape = [embed_size, hidden_size])
@@ -300,7 +301,7 @@ class RNNLM_Model(LanguageModel):
 #                                       dtype=tf.float32)
 #        rnn_outputs.append(rnn_output)
 #
-#      self.final_state = rnn_final_state
+      self.final_state = rnn_final_state
 
     ### END YOUR CODE
     return rnn_outputs
@@ -357,7 +358,7 @@ def generate_text(session, model, config, starting_text='<eos>',
   state = model.initial_state.eval()
   # Imagine tokens as a batch size of one, length of len(tokens[0])
   tokens = [model.vocab.encode(word) for word in starting_text.split()]
-  for i in xrange(stop_length):
+  for i in range(stop_length):
     ### YOUR CODE HERE
     raise NotImplementedError
     ### END YOUR CODE
@@ -393,10 +394,12 @@ def test_RNNLM():
     best_val_epoch = 0
   
     session.run(init)
-    for epoch in xrange(config.max_epochs):
+    for epoch in range(Config.max_epochs):
       print('Epoch {}'.format(epoch))
       start = time.time()
       ###
+
+      print(model.train_step)
       train_pp = model.run_epoch(
           session, model.encoded_train,
           train_op=model.train_step)
