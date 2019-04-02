@@ -81,7 +81,6 @@ class RNNLM_Model(LanguageModel):
     ### YOUR CODE HERE
     self.input_placeholder = tf.placeholder(tf.int32, shape = [None, self.config.num_steps])
     self.labels_placeholder = tf.placeholder(tf.int32, shape = [None, self.config.num_steps]) #int32 made this work in add_loss_op
-    #self.loss_weights = tf.placeholder(tf.float32,shape = [None, self.config.num_steps])
     self.loss_weights = tf.ones([self.config.batch_size,self.config.num_steps])
     self.dropout_placeholder = tf.placeholder(tf.float32, shape = ())
     ### END YOUR CODE
@@ -163,41 +162,46 @@ class RNNLM_Model(LanguageModel):
     hidden_size = self.config.hidden_size
     embed_size = self.config.embed_size
 
-    # create variables
-    #init_state = np.zeros([batch_size, hidden_size]) 
-    #self.initial_state = tf.Variable(init_state, dtype=tf.float32)
-    #self.initial_state = rnn_cell.zero_state(self.config.batch_size, dtype=tf.float32)
-    #self.initial_state = tf.placeholder(tf.float32, shape = [batch_size, hidden_size])
-    #self.final_state = tf.placeholder(tf.float32, shape = tf.shape(self.initial_state))
-    #self.initial_state = tf.zeros(tf.float32, shape = [batch_size, hidden_size])
-    H = tf.placeholder(tf.float32, shape = [hidden_size,hidden_size])
-    I = tf.placeholder(tf.float32, shape = [embed_size, hidden_size])
-    b_1 = tf.placeholder(tf.float32, shape = hidden_size)
-    rnn_outputs = []
-    rnn_cell = tf.nn.rnn_cell.BasicRNNCell(hidden_size)
+    #rnn_cell = tf.nn.rnn_cell.BasicRNNCell(hidden_size)
+    rnn_cell = tf.nn.rnn_cell.GRUCell(hidden_size)
     self.initial_state = rnn_cell.zero_state(self.config.batch_size, dtype=tf.float32)
 
+    inputs_reshaped = tf.reshape(tf.concat(inputs,1),[self.config.batch_size, self.config.num_steps,embed_size])
+    # create variables
+    dropped_inputs = tf.nn.dropout(inputs_reshaped, keep_prob = self.dropout_placeholder)
+    with tf.variable_scope("RNN"):
+      rnn_output, rnn_final_state = tf.nn.dynamic_rnn(rnn_cell, dropped_inputs,
+                                       initial_state=self.initial_state,
+                                       dtype=tf.float32)
+    rnn_output_dropped = tf.nn.dropout(rnn_output,self.dropout_placeholder)
+    self.final_state = rnn_final_state
+    return(rnn_output_dropped)
+
+    """
+    my way
+    rnn_outputs = []
     with tf.variable_scope("RNN"):
       for timestep, input_t in enumerate(inputs):
-        batch = inputs[timestep]
+        batch = tf.nn.dropout(inputs[timestep], self.dropout_placeholder)
         rnn_output, rnn_final_state = tf.nn.dynamic_rnn(rnn_cell, batch,
                                        initial_state=self.initial_state,
                                        dtype=tf.float32)
+
+        #rnn_output_dropped = tf.nn.dropout(rnn_output, keep_prob = self.dropout_placeholder)
+
         if timestep > 0:
           tf.get_variable_scope().reuse_variables()
         with tf.variable_scope("BasicRNNCell"):
           rnn_outputs.append(rnn_output)
 
-#      for batch in inputs:
-#        rnn_output, rnn_final_state = tf.nn.dynamic_rnn(rnn_cell, batch,
-#                                       initial_state=self.initial_state,
-#                                       dtype=tf.float32)
-#        rnn_outputs.append(rnn_output)
-#
       self.final_state = rnn_final_state
 
+    rnn_outputs_reshaped = tf.reshape(tf.concat(rnn_outputs,1),[self.config.batch_size, self.config.num_steps,hidden_size])
+    rnn_outputs_dropped = tf.nn.dropout(rnn_outputs_reshaped, self.dropout_placeholder)
+    """
+
     ### END YOUR CODE
-    return rnn_outputs
+    return rnn_outputs_dropped
 
   def add_projection(self, rnn_outputs):
     """Adds a projection layer.
@@ -220,18 +224,20 @@ class RNNLM_Model(LanguageModel):
                (batch_size, len(vocab)
     """
     ### YOUR CODE HERE
-    hidden_size = self.config.hidden_size
     with tf.variable_scope("RNN", reuse = tf.AUTO_REUSE):
-      U = tf.Variable(tf.random_uniform([hidden_size,len(self.vocab)],-1.0,1.0))
+      U = tf.Variable(tf.random_uniform([self.config.hidden_size,len(self.vocab)],-1.0,1.0))
       b_2 = tf.Variable(tf.random_uniform([len(self.vocab)],-1.0,1.0))
-    #U = tf.placeholder(tf.float32, shape = [hidden_size,len(self.vocab)])
-    #b_2 = tf.placeholder(tf.float32, shape = len(self.vocab))
+    
+    outputs = tf.reshape(tf.matmul(tf.reshape(rnn_outputs, [-1, self.config.hidden_size]), U),
+                         [self.config.batch_size, self.config.num_steps, -1]) + b_2
+    """
+    list version
     outputs = []
-
     for rnn_output in rnn_outputs:
       rnn_output = tf.reshape(rnn_output,[self.config.batch_size,hidden_size])
       output = tf.matmul(rnn_output,U)+b_2
       outputs.append(output)
+    """
 
     ### END YOUR CODE
     return outputs
@@ -291,8 +297,9 @@ class RNNLM_Model(LanguageModel):
     # We want to check how well we correctly predict the next word
     # We cast o to float64 as there are numerical issues at hand
     # (i.e. sum(output of softmax) = 1.00000298179 and not 1)
-    self.predictions = [tf.nn.softmax(tf.cast(o, 'float64')) for o in self.outputs]
-    self.predictions = tf.reshape(tf.concat(self.predictions,0),[self.config.batch_size, self.config.num_steps,len(self.vocab)])
+    #self.predictions = [tf.nn.softmax(tf.cast(o, 'float64')) for o in self.outputs]
+    #self.predictions = tf.reshape(tf.concat(self.predictions,0),[self.config.batch_size, self.config.num_steps,len(self.vocab)])
+    self.predictions = [tf.nn.softmax(tf.cast(self.outputs,'float64'))]
     # Reshape the output into len(vocab) sized chunks - the -1 says as many as
     # needed to evenly divide
     #output = tf.reshape(tf.concat(self.outputs,1), [-1, len(self.vocab)])
@@ -317,13 +324,6 @@ class RNNLM_Model(LanguageModel):
               self.labels_placeholder: y,
               self.initial_state: state,
               self.dropout_placeholder: dp,}
-
-      ######testing#######
-      #loss = session.run(self.calculate_loss, feed_dict=feed)
-      #state = session.run(self.final_state, feed_dict=feed)
-
-      session.run(train_op, feed_dict=feed) # error with this one
-      ####################
       loss, state, _ = session.run(
           [self.calculate_loss, self.final_state, train_op], feed_dict=feed)
       total_loss.append(loss)
@@ -358,13 +358,23 @@ def generate_text(session, model, config, starting_text='<eos>',
   state = model.initial_state.eval()
   # Imagine tokens as a batch size of one, length of len(tokens[0])
   tokens = [model.vocab.encode(word) for word in starting_text.split()]
+
+  for token in tokens:
+    feed = {model.input_placeholder: [[token]],
+            model.initial_state: state,
+            model.dropout_placeholder: 1,}
+    state = session.run(model.final_state, feed_dict = feed)
+
   for i in range(stop_length):
     ### YOUR CODE HERE
-    FEED
+    feed = {model.input_placeholder: [[token]],
+        model.initial_state: state,
+        model.dropout_placeholder: 1,}
+    state, y_pred = session.run([model.final_state, model.predictions[-1]], feed_dict = feed)
 
-    raise NotImplementedError
+    #raise NotImplementedError
     ### END YOUR CODE
-    next_word_idx = sample(y_pred[0], temperature=temp)
+    next_word_idx = sample(y_pred[0,0], temperature=temp)
     tokens.append(next_word_idx)
     if stop_tokens and model.vocab.decode(tokens[-1]) in stop_tokens:
       break
