@@ -25,9 +25,9 @@ class Config(object):
   """
   batch_size = 64
   embed_size = 50
-  hidden_size = 100
+  hidden_size = 128
   num_steps = 10
-  max_epochs = 16
+  max_epochs = 20
   early_stopping = 2
   dropout = 0.9
   lr = 0.001
@@ -102,22 +102,26 @@ class RNNLM_Model(LanguageModel):
               a tensor of shape (batch_size, embed_size).
     """
 
-    L = tf.Variable(tf.random_uniform([len(self.vocab), self.config.embed_size], -1.0, 1.0))
-    #L = tf.placeholder(tf.float32, shape = [len(self.vocab), self.config.embed_size])
-    inputs = []
+    with tf.variable_scope("RNN", reuse = tf.AUTO_REUSE):
+      #L = tf.Variable(tf.random_uniform([len(self.vocab), self.config.embed_size], -1.0, 1.0))
+      L = tf.get_variable("L", shape = [len(self.vocab),self.config.embed_size],initializer = tf.random_uniform_initializer)
+    inputs = tf.nn.embedding_lookup(L,self.input_placeholder)
+    return(inputs)
 
+    """
+    inputs = []
     # The embedding lookup is currently only implemented for the CPU
     split = tf.split(self.input_placeholder,self.config.num_steps,axis = 1)
     with tf.device('/cpu:0'):
       ### YOUR CODE HERE
       for ii in range(self.config.num_steps):
         embed = tf.nn.embedding_lookup(L,split[ii])
-        #embed = tf.nn.embedding_lookup(L, self.input_placeholder)
-
+   
         inputs.append(embed)      
-
+    
       ### END YOUR CODE
       return inputs
+    """
 
   def add_model(self, inputs):
     """Creates the RNN LM model.
@@ -166,9 +170,9 @@ class RNNLM_Model(LanguageModel):
     rnn_cell = tf.nn.rnn_cell.GRUCell(hidden_size)
     self.initial_state = rnn_cell.zero_state(self.config.batch_size, dtype=tf.float32)
 
-    inputs_reshaped = tf.reshape(tf.concat(inputs,1),[self.config.batch_size, self.config.num_steps,embed_size])
+    #inputs_reshaped = tf.reshape(tf.concat(inputs,1),[self.config.batch_size, self.config.num_steps,embed_size])
     # create variables
-    dropped_inputs = tf.nn.dropout(inputs_reshaped, keep_prob = self.dropout_placeholder)
+    dropped_inputs = tf.nn.dropout(inputs, keep_prob = self.dropout_placeholder)
     with tf.variable_scope("RNN"):
       rnn_output, rnn_final_state = tf.nn.dynamic_rnn(rnn_cell, dropped_inputs,
                                        initial_state=self.initial_state,
@@ -178,7 +182,7 @@ class RNNLM_Model(LanguageModel):
     return(rnn_output_dropped)
 
     """
-    my way
+    list way
     rnn_outputs = []
     with tf.variable_scope("RNN"):
       for timestep, input_t in enumerate(inputs):
@@ -225,8 +229,10 @@ class RNNLM_Model(LanguageModel):
     """
     ### YOUR CODE HERE
     with tf.variable_scope("RNN", reuse = tf.AUTO_REUSE):
-      U = tf.Variable(tf.random_uniform([self.config.hidden_size,len(self.vocab)],-1.0,1.0))
-      b_2 = tf.Variable(tf.random_uniform([len(self.vocab)],-1.0,1.0))
+      U = tf.get_variable("U", shape = [self.config.hidden_size, len(self.vocab)])
+      b_2 = tf.get_variable("b_2", shape = [len(self.vocab),])
+      #U = tf.Variable(tf.random_uniform([self.config.hidden_size,len(self.vocab)],-1.0,1.0))
+      #b_2 = tf.Variable(tf.random_uniform([len(self.vocab)],-1.0,1.0))
     
     outputs = tf.reshape(tf.matmul(tf.reshape(rnn_outputs, [-1, self.config.hidden_size]), U),
                          [self.config.batch_size, self.config.num_steps, -1]) + b_2
@@ -279,9 +285,8 @@ class RNNLM_Model(LanguageModel):
     ### YOUR CODE HERE
     #with tf.variable_scope(tf.get_variable_scope(),reuse=tf.AUTO_REUSE):
     with tf.variable_scope("RNN", reuse = tf.AUTO_REUSE):
-      opt = tf.train.AdamOptimizer()
+      opt = tf.train.AdamOptimizer(self.config.lr)
       train_op = opt.minimize(loss)
-      #print(train_op)
 
     ### END YOUR CODE
     return train_op
@@ -365,17 +370,20 @@ def generate_text(session, model, config, starting_text='<eos>',
             model.dropout_placeholder: 1,}
     state = session.run(model.final_state, feed_dict = feed)
 
+  last_word = token
   for i in range(stop_length):
     ### YOUR CODE HERE
-    feed = {model.input_placeholder: [[token]],
+    feed = {model.input_placeholder: [[last_word]],
         model.initial_state: state,
         model.dropout_placeholder: 1,}
-    state, y_pred = session.run([model.final_state, model.predictions[-1]], feed_dict = feed)
 
-    #raise NotImplementedError
+    state, y_pred = session.run([model.final_state, model.predictions[-1]], feed_dict = feed)
     ### END YOUR CODE
+
     next_word_idx = sample(y_pred[0,0], temperature=temp)
     tokens.append(next_word_idx)
+    last_word = next_word_idx
+
     if stop_tokens and model.vocab.decode(tokens[-1]) in stop_tokens:
       break
   output = [model.vocab.decode(word_idx) for word_idx in tokens]
@@ -430,11 +438,17 @@ def test_RNNLM():
     print('Test perplexity: {}'.format(test_pp))
     print('=-=' * 5)
 
-    starting_snippets = ['in boston', 'they have', 'please', 'today', 'the president']
+    compare_test_get = False
+    if compare_test_get:
+      test_gen = gen_model.run_epoch(session, model.encoded_test)
+      print('Gen Test perplexity: {}'.format(test_gen))
+      print('=-=' * 5)
+
+    starting_snippets = ['in boston', 'they have', 'please', 'today', 'the president', 'in winter', 'i want', 'look at', 'come to', 'he said']
     for starting_text in starting_snippets:
       print('\n')
       print(' '.join(generate_sentence(
-          session, gen_model, gen_config, starting_text=starting_text, temp=1.0)))
+          session, gen_model, gen_config, starting_text=starting_text, temp=1)))
 
 if __name__ == "__main__":
     test_RNNLM()
