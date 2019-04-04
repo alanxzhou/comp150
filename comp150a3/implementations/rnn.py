@@ -22,12 +22,6 @@ def rnn(wt_h, wt_x, bias, init_state, input_data):
         final_state: the final hidden state
     """
 
-#    data_term = np.dot(input_data,wt_x)
-#    hidden_term = np.dot(init_state,wt_h)
-
-#    for ii in range(np.shape(data_term)[1]):
-#        data_term[:,ii,:] += hidden_term
-
     batch_size, time_steps, _ = np.shape(input_data)
     hidden_size = np.shape(bias)
     outputs = np.zeros((batch_size,time_steps,hidden_size[0]))
@@ -78,10 +72,6 @@ def gru(wtu_h, wtu_x, biasu, wtr_h, wtr_x, biasr, wtc_h, wtc_x, biasc, init_stat
     outputs = np.zeros((batch_size,time_steps,hidden_size[0]))
 
     nsteps = np.shape(input_data)[1]
-
-    #print(np.shape(init_state))
-    #print(np.shape(biasc))
-    #print(np.shape(input_data[:,1,:]))
 
     for ii in range(nsteps):
         u = sigmoid(np.dot(init_state,wtu_h)+np.dot(input_data[:,ii,:],wtu_x)+biasu)
